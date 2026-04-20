@@ -1,0 +1,52 @@
+# Expo
+.expo/
+dist/
+web-build/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Build output
+*.tsbuildinfo
+
+# Logs
+npm-debug.log
+yarn-error.log
+
+# Env
+.env
+.env.local
+
+# Replit platform files (not needed locally)
+.replit
+.replitignore
+.cache/
+.local/
+
+# Replit workspace artifacts folder (Replit-internal only)
+artifacts/
+
+# Native
+android/
+ios/
+
+# Keystores and signing
+*.jks
+*.keystore
+android/key.properties
+
+# Android build outputs
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+
+# ai config
+.codex

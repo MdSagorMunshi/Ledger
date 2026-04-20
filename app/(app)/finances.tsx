@@ -1,0 +1,1293 @@
+import React, { useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Switch,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { useLedger, OweEntry, LendEntry, SavingsGoal } from "@/context/LedgerContext";
+import { computeNetWorth } from "@/utils/netWorth";
+import { getThemeColors } from "@/constants/colors";
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function SLabel({ label }: { label: string }) {
+  return <Text style={styles.sLabel}>{label}</Text>;
+}
+
+function Badge({ text, color }: { text: string; color: string }) {
+  return (
+    <View style={[styles.badge, { borderColor: color }]}>
+      <Text style={[styles.badgeText, { color }]}>{text}</Text>
+    </View>
+  );
+}
+
+function ProgressBar({
+  value,
+  max,
+  C,
+}: {
+  value: number;
+  max: number | null;
+  C: ReturnType<typeof getThemeColors>;
+}) {
+  if (max === null || max === 0) return null;
+  const pct = Math.min(1, value / max);
+  const barColor = pct >= 1 ? C.creditGreen : pct >= 0.5 ? C.amberSignal : C.ghostText;
+  return (
+    <View style={[styles.progressBar, { backgroundColor: C.wireGray }]}>
+      <View style={[styles.progressFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
+    </View>
+  );
+}
+
+export default function FinancesScreen() {
+  const {
+    transactions,
+    savingsTransactions,
+    savingsGoals,
+    assetEntries,
+    oweEntries,
+    lendEntries,
+    appSettings,
+    addAssetEntry,
+    updateAssetEntry,
+    deleteAssetEntry,
+    addSavingsTransaction,
+    addSavingsGoal,
+    deleteSavingsGoal,
+    addOweEntry,
+    repayOweEntry,
+    addLendEntry,
+    repayLendEntry,
+    toggleLendNetWorth,
+    addTransaction,
+    formatAmount,
+  } = useLedger();
+
+  const C = getThemeColors(appSettings.theme);
+
+  const nw = useMemo(
+    () =>
+      computeNetWorth({
+        transactions,
+        savingsTransactions,
+        assetEntries,
+        oweEntries,
+        lendEntries,
+      }),
+    [transactions, savingsTransactions, assetEntries, oweEntries, lendEntries]
+  );
+
+  const savingsPool = useMemo(
+    () =>
+      savingsTransactions.filter((s) => s.direction === "in").reduce((sum, s) => sum + s.amount, 0) -
+      savingsTransactions.filter((s) => s.direction === "out").reduce((sum, s) => sum + s.amount, 0),
+    [savingsTransactions]
+  );
+
+  const [assetsExpanded, setAssetsExpanded] = useState(true);
+  const [liabsExpanded, setLiabsExpanded] = useState(true);
+  const [showAddAsset, setShowAddAsset] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<string | null>(null);
+  const [assetLabel, setAssetLabel] = useState("");
+  const [assetValue, setAssetValue] = useState("");
+  const [assetType, setAssetType] = useState<"asset" | "liability">("asset");
+
+  const [showTransferIn, setShowTransferIn] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showAddGoal, setShowAddGoal] = useState(false);
+  const [savAmount, setSavAmount] = useState("");
+  const [savGoalId, setSavGoalId] = useState<string | null>(null);
+  const [savNote, setSavNote] = useState("");
+  const [savDate, setSavDate] = useState(todayStr());
+  const [goalLabel, setGoalLabel] = useState("");
+  const [goalTarget, setGoalTarget] = useState("");
+  const [goalDeadline, setGoalDeadline] = useState("");
+
+  const [showAddOwe, setShowAddOwe] = useState(false);
+  const [oweName, setOweName] = useState("");
+  const [oweAmt, setOweAmt] = useState("");
+  const [oweReason, setOweReason] = useState("");
+  const [oweBorrowed, setOweBorrowed] = useState(todayStr());
+  const [oweDue, setOweDue] = useState("");
+  const [repayingOweId, setRepayingOweId] = useState<string | null>(null);
+  const [repayAmt, setRepayAmt] = useState("");
+  const [repayNote, setRepayNote] = useState("");
+  const [repayDate, setRepayDate] = useState(todayStr());
+  const [settledExpanded, setSettledExpanded] = useState(false);
+
+  const [showAddLend, setShowAddLend] = useState(false);
+  const [lendName, setLendName] = useState("");
+  const [lendAmt, setLendAmt] = useState("");
+  const [lendReason, setLendReason] = useState("");
+  const [lendDate, setLendDate] = useState(todayStr());
+  const [lendReturn, setLendReturn] = useState("");
+  const [repayingLendId, setRepayingLendId] = useState<string | null>(null);
+  const [lendRepayAmt, setLendRepayAmt] = useState("");
+  const [lendRepayNote, setLendRepayNote] = useState("");
+  const [lendRepayDate, setLendRepayDate] = useState(todayStr());
+  const [lendSettledExpanded, setLendSettledExpanded] = useState(false);
+
+  const today = todayStr();
+
+  const nwColor =
+    nw.total > 0 ? C.creditGreen : nw.total < 0 ? C.debitRed : C.cipherWhite;
+
+  const handleAddAsset = () => {
+    const v = parseFloat(assetValue);
+    if (!assetLabel.trim() || isNaN(v) || v <= 0) return;
+    if (editingAsset) {
+      updateAssetEntry(editingAsset, { label: assetLabel.trim(), value: v, type: assetType });
+      setEditingAsset(null);
+    } else {
+      addAssetEntry({ label: assetLabel.trim(), value: v, type: assetType, isManual: true });
+    }
+    setAssetLabel("");
+    setAssetValue("");
+    setAssetType("asset");
+    setShowAddAsset(false);
+  };
+
+  const handleTransferIn = () => {
+    const amt = parseFloat(savAmount);
+    if (isNaN(amt) || amt <= 0) return;
+    const ledgerId = addTransaction({
+      type: "expense",
+      amount: amt,
+      category: "Savings",
+      note: savNote || "Transfer to savings",
+      date: savDate,
+      subtype: "savings_transfer",
+    });
+    addSavingsTransaction({
+      direction: "in",
+      amount: amt,
+      goalId: savGoalId,
+      note: savNote,
+      date: savDate,
+      linkedLedgerTxId: ledgerId,
+    });
+    setSavAmount(""); setSavNote(""); setSavGoalId(null); setSavDate(todayStr());
+    setShowTransferIn(false);
+  };
+
+  const handleWithdraw = () => {
+    const amt = parseFloat(savAmount);
+    if (isNaN(amt) || amt <= 0) return;
+    const ledgerId = addTransaction({
+      type: "income",
+      amount: amt,
+      category: "Savings",
+      note: savNote || "Withdrawal from savings",
+      date: savDate,
+      subtype: "savings_withdrawal",
+    });
+    addSavingsTransaction({
+      direction: "out",
+      amount: amt,
+      goalId: savGoalId,
+      note: savNote,
+      date: savDate,
+      linkedLedgerTxId: ledgerId,
+    });
+    setSavAmount(""); setSavNote(""); setSavGoalId(null); setSavDate(todayStr());
+    setShowWithdraw(false);
+  };
+
+  const handleAddGoal = () => {
+    if (!goalLabel.trim()) return;
+    const target = goalTarget ? parseFloat(goalTarget) : null;
+    addSavingsGoal({
+      label: goalLabel.trim(),
+      targetAmount: target && target > 0 ? target : null,
+      deadline: goalDeadline || null,
+      allocatedAmount: 0,
+    });
+    setGoalLabel(""); setGoalTarget(""); setGoalDeadline("");
+    setShowAddGoal(false);
+  };
+
+  const handleAddOwe = () => {
+    const amt = parseFloat(oweAmt);
+    if (!oweName.trim() || isNaN(amt) || amt <= 0) return;
+    addOweEntry({
+      personName: oweName.trim(),
+      originalAmount: amt,
+      remainingAmount: amt,
+      reason: oweReason.trim(),
+      dateBorrowed: oweBorrowed,
+      dueDate: oweDue || null,
+      status: "unpaid",
+      repayments: [],
+    });
+    setOweName(""); setOweAmt(""); setOweReason(""); setOweBorrowed(todayStr()); setOweDue("");
+    setShowAddOwe(false);
+  };
+
+  const handleRepayOwe = (owe: OweEntry) => {
+    const amt = parseFloat(repayAmt);
+    if (isNaN(amt) || amt <= 0) return;
+    const ledgerId = addTransaction({
+      type: "expense",
+      amount: amt,
+      category: "Debt Repayment",
+      note: repayNote || `Repayment to ${owe.personName}`,
+      date: repayDate,
+      subtype: "debt_repayment",
+    });
+    repayOweEntry(owe.id, { amount: amt, date: repayDate, ledgerTxId: ledgerId });
+    setRepayingOweId(null); setRepayAmt(""); setRepayNote(""); setRepayDate(todayStr());
+  };
+
+  const handleAddLend = () => {
+    const amt = parseFloat(lendAmt);
+    if (!lendName.trim() || isNaN(amt) || amt <= 0) return;
+    addLendEntry({
+      personName: lendName.trim(),
+      originalAmount: amt,
+      remainingAmount: amt,
+      reason: lendReason.trim(),
+      dateLent: lendDate,
+      expectedReturnDate: lendReturn || null,
+      status: "outstanding",
+      countInNetWorth: true,
+      repayments: [],
+    });
+    setLendName(""); setLendAmt(""); setLendReason(""); setLendDate(todayStr()); setLendReturn("");
+    setShowAddLend(false);
+  };
+
+  const handleRepayLend = (lend: LendEntry) => {
+    const amt = parseFloat(lendRepayAmt);
+    if (isNaN(amt) || amt <= 0) return;
+    const ledgerId = addTransaction({
+      type: "income",
+      amount: amt,
+      category: "Lend Returned",
+      note: lendRepayNote || `Repayment from ${lend.personName}`,
+      date: lendRepayDate,
+      subtype: "lend_returned",
+    });
+    repayLendEntry(lend.id, { amount: amt, date: lendRepayDate, ledgerTxId: ledgerId });
+    setRepayingLendId(null); setLendRepayAmt(""); setLendRepayNote(""); setLendRepayDate(todayStr());
+  };
+
+  const activeOwe = oweEntries.filter((o) => o.status !== "settled");
+  const settledOwe = oweEntries.filter((o) => o.status === "settled");
+  const activeLend = lendEntries.filter((l) => l.status !== "returned");
+  const returnedLend = lendEntries.filter((l) => l.status === "returned");
+
+  const manualAssets = assetEntries.filter((a) => a.isManual && a.type === "asset");
+  const manualLiabs = assetEntries.filter((a) => a.isManual && a.type === "liability");
+
+  return (
+    <ScrollView
+      style={[styles.scroll, { backgroundColor: C.forgeBlack }]}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* NET WORTH SUMMARY */}
+      <View style={[styles.nwCard, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <Text style={[styles.nwHeading, { color: C.ghostText }]}>NET WORTH</Text>
+        <Text style={[styles.nwValue, { color: nwColor }]}>{formatAmount(nw.total)}</Text>
+        <View style={styles.nwSubRow}>
+          <View style={styles.nwSubItem}>
+            <Text style={[styles.nwSubLabel, { color: C.creditGreen }]}>ASSETS</Text>
+            <Text style={[styles.nwSubAmount, { color: C.creditGreen }]}>{formatAmount(nw.totalAssets)}</Text>
+          </View>
+          <View style={[styles.nwSubDivider, { backgroundColor: C.wireGray }]} />
+          <View style={styles.nwSubItem}>
+            <Text style={[styles.nwSubLabel, { color: C.debitRed }]}>LIABILITIES</Text>
+            <Text style={[styles.nwSubAmount, { color: C.debitRed }]}>{formatAmount(nw.totalLiabilities)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ASSETS BREAKDOWN */}
+      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <TouchableOpacity style={styles.collapsibleHeader} onPress={() => setAssetsExpanded((v) => !v)}>
+          <SLabel label="ASSETS" />
+          <Feather name={assetsExpanded ? "chevron-up" : "chevron-down"} size={14} color={C.ghostText} />
+        </TouchableOpacity>
+        {assetsExpanded && (
+          <View style={styles.assetList}>
+            <AssetRow label="Spendable Balance" value={nw.spendableBalance} isAuto C={C} formatAmount={formatAmount} />
+            <AssetRow label="Savings Pool" value={nw.savingsPool} isAuto C={C} formatAmount={formatAmount} />
+            {activeLend.filter(l => l.countInNetWorth).map((l) => (
+              <AssetRow key={l.id} label={`Lend: ${l.personName}`} value={l.remainingAmount} isAuto C={C} formatAmount={formatAmount} />
+            ))}
+            {manualAssets.map((a) => (
+              <AssetRow
+                key={a.id}
+                label={a.label}
+                value={a.value}
+                C={C}
+                formatAmount={formatAmount}
+                onEdit={() => {
+                  setEditingAsset(a.id);
+                  setAssetLabel(a.label);
+                  setAssetValue(String(a.value));
+                  setAssetType("asset");
+                  setShowAddAsset(true);
+                }}
+                onDelete={() => deleteAssetEntry(a.id)}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* LIABILITIES BREAKDOWN */}
+      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <TouchableOpacity style={styles.collapsibleHeader} onPress={() => setLiabsExpanded((v) => !v)}>
+          <SLabel label="LIABILITIES" />
+          <Feather name={liabsExpanded ? "chevron-up" : "chevron-down"} size={14} color={C.ghostText} />
+        </TouchableOpacity>
+        {liabsExpanded && (
+          <View style={styles.assetList}>
+            {activeOwe.map((o) => (
+              <AssetRow key={o.id} label={`Owe: ${o.personName}`} value={o.remainingAmount} isAuto C={C} formatAmount={formatAmount} color={C.debitRed} />
+            ))}
+            {manualLiabs.map((a) => (
+              <AssetRow
+                key={a.id}
+                label={a.label}
+                value={a.value}
+                C={C}
+                color={C.debitRed}
+                formatAmount={formatAmount}
+                onEdit={() => {
+                  setEditingAsset(a.id);
+                  setAssetLabel(a.label);
+                  setAssetValue(String(a.value));
+                  setAssetType("liability");
+                  setShowAddAsset(true);
+                }}
+                onDelete={() => deleteAssetEntry(a.id)}
+              />
+            ))}
+            {nw.totalLiabilities === 0 && (
+              <Text style={[styles.emptyText, { color: C.ghostText }]}>No liabilities</Text>
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* ADD ASSET FAB */}
+      <TouchableOpacity
+        style={[styles.addAssetBtn, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]}
+        onPress={() => { setEditingAsset(null); setShowAddAsset(true); }}
+      >
+        <Feather name="plus" size={14} color={C.amberSignal} />
+        <Text style={[styles.addAssetBtnText, { color: C.amberSignal }]}>ADD ASSET / LIABILITY</Text>
+      </TouchableOpacity>
+
+      {/* SAVINGS SECTION */}
+      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <SLabel label="SAVINGS" />
+        <View style={[styles.savingsSummary, { backgroundColor: C.forgeBlack, borderColor: C.wireGray }]}>
+          <Text style={[styles.savingsLabel, { color: C.ghostText }]}>POOL BALANCE</Text>
+          <Text style={[styles.savingsAmount, { color: C.creditGreen }]}>{formatAmount(savingsPool)}</Text>
+        </View>
+        <View style={styles.savingsActions}>
+          <TouchableOpacity
+            style={[styles.savingsBtn, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15` }]}
+            onPress={() => setShowTransferIn(true)}
+          >
+            <Feather name="arrow-up" size={12} color={C.creditGreen} />
+            <Text style={[styles.savingsBtnText, { color: C.creditGreen }]}>TRANSFER IN</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.savingsBtn, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]}
+            onPress={() => setShowWithdraw(true)}
+          >
+            <Feather name="arrow-down" size={12} color={C.debitRed} />
+            <Text style={[styles.savingsBtnText, { color: C.debitRed }]}>WITHDRAW</Text>
+          </TouchableOpacity>
+        </View>
+
+        {savingsGoals.length > 0 && (
+          <View style={styles.goalsList}>
+            {savingsGoals.map((g) => {
+              const isFunded = g.targetAmount !== null && g.allocatedAmount >= g.targetAmount;
+              return (
+                <View key={g.id} style={[styles.goalCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray }]}>
+                  <View style={styles.goalTop}>
+                    <Text style={[styles.goalLabel, { color: C.cipherWhite }]}>{g.label}</Text>
+                    <View style={styles.goalRight}>
+                      {isFunded && <Badge text="FUNDED" color={C.creditGreen} />}
+                      <TouchableOpacity onPress={() => deleteSavingsGoal(g.id)}>
+                        <Feather name="trash-2" size={12} color={C.ghostText} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <Text style={[styles.goalMeta, { color: C.slateText }]}>
+                    {formatAmount(g.allocatedAmount)} / {g.targetAmount ? formatAmount(g.targetAmount) : "Open Goal"}
+                    {g.deadline ? `  ·  Due ${g.deadline}` : ""}
+                  </Text>
+                  <ProgressBar value={g.allocatedAmount} max={g.targetAmount} C={C} />
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.addGoalBtn, { borderColor: C.wireGray }]}
+          onPress={() => setShowAddGoal(true)}
+        >
+          <Feather name="plus" size={12} color={C.ghostText} />
+          <Text style={[styles.addGoalBtnText, { color: C.ghostText }]}>ADD GOAL</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* I OWE SECTION */}
+      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <View style={styles.sectionTopRow}>
+          <SLabel label="I OWE" />
+          <TouchableOpacity
+            style={[styles.sectionAddBtn, { borderColor: C.wireGray }]}
+            onPress={() => setShowAddOwe(true)}
+          >
+            <Feather name="plus" size={11} color={C.ghostText} />
+            <Text style={[styles.sectionAddBtnText, { color: C.ghostText }]}>ADD</Text>
+          </TouchableOpacity>
+        </View>
+        {activeOwe.length > 0 && (
+          <Text style={[styles.oweSummary, { color: C.debitRed }]}>
+            Total: {formatAmount(activeOwe.reduce((s, o) => s + o.remainingAmount, 0))}
+          </Text>
+        )}
+        {activeOwe.map((owe) => {
+          const isOverdue = owe.dueDate && owe.dueDate < today && owe.status !== "settled";
+          return (
+            <View
+              key={owe.id}
+              style={[
+                styles.oweCard,
+                { backgroundColor: C.forgeBlack, borderColor: C.wireGray },
+                isOverdue && { borderLeftColor: C.debitRed, borderLeftWidth: 3 },
+              ]}
+            >
+              <View style={styles.oweTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.oweName, { color: C.cipherWhite }]}>{owe.personName}</Text>
+                  {!!owe.reason && <Text style={[styles.oweReason, { color: C.slateText }]}>{owe.reason}</Text>}
+                  <Text style={[styles.oweDate, { color: C.ghostText }]}>
+                    Borrowed {owe.dateBorrowed}{owe.dueDate ? `  ·  Due ${owe.dueDate}` : ""}
+                  </Text>
+                </View>
+                <View style={styles.oweRight}>
+                  {isOverdue && <Text style={[styles.overdueLabel, { color: C.debitRed }]}>OVERDUE</Text>}
+                  <Text style={[styles.oweRemaining, { color: C.debitRed }]}>{formatAmount(owe.remainingAmount)}</Text>
+                  <Text style={[styles.oweOriginal, { color: C.ghostText }]}>of {formatAmount(owe.originalAmount)}</Text>
+                </View>
+              </View>
+              {repayingOweId === owe.id ? (
+                <View style={styles.repayForm}>
+                  <TextInput
+                    style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
+                    value={repayAmt}
+                    onChangeText={setRepayAmt}
+                    placeholder={`Amount (max ${formatAmount(owe.remainingAmount)})`}
+                    placeholderTextColor={C.ghostText}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
+                    value={repayNote}
+                    onChangeText={setRepayNote}
+                    placeholder="Note (optional)"
+                    placeholderTextColor={C.ghostText}
+                  />
+                  <TextInput
+                    style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
+                    value={repayDate}
+                    onChangeText={setRepayDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={C.ghostText}
+                  />
+                  <View style={styles.repayBtns}>
+                    <TouchableOpacity
+                      style={[styles.repayBtn, { borderColor: C.wireGray }]}
+                      onPress={() => setRepayingOweId(null)}
+                    >
+                      <Text style={[styles.repayBtnText, { color: C.slateText }]}>CANCEL</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.repayBtn, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15`, flex: 1 }]}
+                      onPress={() => handleRepayOwe(owe)}
+                    >
+                      <Text style={[styles.repayBtnText, { color: C.creditGreen }]}>RECORD REPAYMENT</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.repayTrigger, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}10` }]}
+                  onPress={() => {
+                    setRepayingOweId(owe.id);
+                    setRepayAmt(String(owe.remainingAmount));
+                    setRepayDate(todayStr());
+                    setRepayNote("");
+                  }}
+                >
+                  <Text style={[styles.repayTriggerText, { color: C.debitRed }]}>REPAY</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+        {settledOwe.length > 0 && (
+          <TouchableOpacity style={styles.settledToggle} onPress={() => setSettledExpanded((v) => !v)}>
+            <Text style={[styles.settledToggleText, { color: C.ghostText }]}>
+              SETTLED ({settledOwe.length}) {settledExpanded ? "▲" : "▼"}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {settledExpanded && settledOwe.map((owe) => (
+          <View key={owe.id} style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}>
+            <View style={styles.oweTop}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.oweName, { color: C.cipherWhite }]}>{owe.personName}</Text>
+                {!!owe.reason && <Text style={[styles.oweReason, { color: C.slateText }]}>{owe.reason}</Text>}
+              </View>
+              <Badge text="SETTLED" color={C.ghostText} />
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* I LENT SECTION */}
+      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <View style={styles.sectionTopRow}>
+          <SLabel label="I LENT" />
+          <TouchableOpacity
+            style={[styles.sectionAddBtn, { borderColor: C.wireGray }]}
+            onPress={() => setShowAddLend(true)}
+          >
+            <Feather name="plus" size={11} color={C.ghostText} />
+            <Text style={[styles.sectionAddBtnText, { color: C.ghostText }]}>ADD</Text>
+          </TouchableOpacity>
+        </View>
+        {activeLend.length > 0 && (
+          <Text style={[styles.oweSummary, { color: C.creditGreen }]}>
+            Total: {formatAmount(activeLend.reduce((s, l) => s + l.remainingAmount, 0))}
+          </Text>
+        )}
+        {activeLend.map((lend) => {
+          const isOverdue =
+            lend.expectedReturnDate && lend.expectedReturnDate < today && lend.status !== "returned";
+          return (
+            <View
+              key={lend.id}
+              style={[
+                styles.oweCard,
+                { backgroundColor: C.forgeBlack, borderColor: C.wireGray },
+                isOverdue && { borderLeftColor: C.amberSignal, borderLeftWidth: 3 },
+              ]}
+            >
+              <View style={styles.oweTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.oweName, { color: C.cipherWhite }]}>{lend.personName}</Text>
+                  {!!lend.reason && <Text style={[styles.oweReason, { color: C.slateText }]}>{lend.reason}</Text>}
+                  <Text style={[styles.oweDate, { color: C.ghostText }]}>
+                    Lent {lend.dateLent}{lend.expectedReturnDate ? `  ·  Due ${lend.expectedReturnDate}` : ""}
+                  </Text>
+                </View>
+                <View style={styles.oweRight}>
+                  {isOverdue && <Text style={[styles.overdueLabel, { color: C.amberSignal }]}>OVERDUE</Text>}
+                  <Text style={[styles.oweRemaining, { color: C.creditGreen }]}>{formatAmount(lend.remainingAmount)}</Text>
+                  <Text style={[styles.oweOriginal, { color: C.ghostText }]}>of {formatAmount(lend.originalAmount)}</Text>
+                </View>
+              </View>
+              <View style={styles.lendToggleRow}>
+                <Text style={[styles.lendToggleLabel, { color: lend.countInNetWorth ? C.slateText : C.ghostText }]}>
+                  COUNT IN NET WORTH
+                </Text>
+                <Switch
+                  value={lend.countInNetWorth}
+                  onValueChange={() => toggleLendNetWorth(lend.id)}
+                  trackColor={{ false: C.wireGray, true: `${C.creditGreen}60` }}
+                  thumbColor={lend.countInNetWorth ? C.creditGreen : C.slateText}
+                  style={{ transform: [{ scale: 0.8 }] }}
+                />
+              </View>
+              {!lend.countInNetWorth && (
+                <Text style={[styles.excludedNote, { color: C.ghostText }]}>Excluded from net worth</Text>
+              )}
+              {repayingLendId === lend.id ? (
+                <View style={styles.repayForm}>
+                  <TextInput
+                    style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
+                    value={lendRepayAmt}
+                    onChangeText={setLendRepayAmt}
+                    placeholder={`Amount received`}
+                    placeholderTextColor={C.ghostText}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
+                    value={lendRepayNote}
+                    onChangeText={setLendRepayNote}
+                    placeholder="Note (optional)"
+                    placeholderTextColor={C.ghostText}
+                  />
+                  <TextInput
+                    style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
+                    value={lendRepayDate}
+                    onChangeText={setLendRepayDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={C.ghostText}
+                  />
+                  <View style={styles.repayBtns}>
+                    <TouchableOpacity
+                      style={[styles.repayBtn, { borderColor: C.wireGray }]}
+                      onPress={() => setRepayingLendId(null)}
+                    >
+                      <Text style={[styles.repayBtnText, { color: C.slateText }]}>CANCEL</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.repayBtn, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15`, flex: 1 }]}
+                      onPress={() => handleRepayLend(lend)}
+                    >
+                      <Text style={[styles.repayBtnText, { color: C.creditGreen }]}>RECORD RECEIVED</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.repayTrigger, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}10` }]}
+                  onPress={() => {
+                    setRepayingLendId(lend.id);
+                    setLendRepayAmt(String(lend.remainingAmount));
+                    setLendRepayDate(todayStr());
+                    setLendRepayNote("");
+                  }}
+                >
+                  <Text style={[styles.repayTriggerText, { color: C.creditGreen }]}>REPAYMENT RECEIVED</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+        {returnedLend.length > 0 && (
+          <TouchableOpacity style={styles.settledToggle} onPress={() => setLendSettledExpanded((v) => !v)}>
+            <Text style={[styles.settledToggleText, { color: C.ghostText }]}>
+              RETURNED ({returnedLend.length}) {lendSettledExpanded ? "▲" : "▼"}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {lendSettledExpanded && returnedLend.map((lend) => (
+          <View key={lend.id} style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}>
+            <View style={styles.oweTop}>
+              <Text style={[styles.oweName, { color: C.cipherWhite }]}>{lend.personName}</Text>
+              <Badge text="RETURNED" color={C.ghostText} />
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* OVERLAYS */}
+      <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); setEditingAsset(null); }} C={C} title={editingAsset ? "EDIT ENTRY" : "ADD ASSET / LIABILITY"}>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>LABEL</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetLabel} onChangeText={setAssetLabel} placeholder="e.g. Savings Account" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>VALUE</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetValue} onChangeText={setAssetValue} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>TYPE</Text>
+        <View style={styles.typeToggle}>
+          {(["asset", "liability"] as const).map((t) => (
+            <TouchableOpacity key={t} style={[styles.typeBtn, { borderColor: assetType === t ? C.amberSignal : C.wireGray, backgroundColor: assetType === t ? `${C.amberSignal}15` : "transparent" }]} onPress={() => setAssetType(t)}>
+              <Text style={[styles.typeBtnText, { color: assetType === t ? C.amberSignal : C.slateText }]}>{t.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]} onPress={handleAddAsset}>
+          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{editingAsset ? "UPDATE" : "ADD"}</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+
+      <SimpleOverlay visible={showTransferIn} onClose={() => setShowTransferIn(false)} C={C} title="TRANSFER IN">
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>GOAL (OPTIONAL)</Text>
+        <GoalSelector goals={savingsGoals} selected={savGoalId} onSelect={setSavGoalId} C={C} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>NOTE (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savNote} onChangeText={setSavNote} placeholder="Note..." placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15` }]} onPress={handleTransferIn}>
+          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>TRANSFER</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+
+      <SimpleOverlay visible={showWithdraw} onClose={() => setShowWithdraw(false)} C={C} title="WITHDRAW">
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>FROM GOAL (OPTIONAL)</Text>
+        <GoalSelector goals={savingsGoals} selected={savGoalId} onSelect={setSavGoalId} C={C} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>NOTE (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savNote} onChangeText={setSavNote} placeholder="Note..." placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]} onPress={handleWithdraw}>
+          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>WITHDRAW</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+
+      <SimpleOverlay visible={showAddGoal} onClose={() => setShowAddGoal(false)} C={C} title="ADD GOAL">
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>LABEL</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalLabel} onChangeText={setGoalLabel} placeholder="e.g. Emergency Fund" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>TARGET AMOUNT (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalTarget} onChangeText={setGoalTarget} placeholder="Leave empty for open goal" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DEADLINE (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalDeadline} onChangeText={setGoalDeadline} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]} onPress={handleAddGoal}>
+          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>ADD GOAL</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+
+      <SimpleOverlay visible={showAddOwe} onClose={() => setShowAddOwe(false)} C={C} title="ADD OWE ENTRY">
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>PERSON NAME</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweName} onChangeText={setOweName} placeholder="Name" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweAmt} onChangeText={setOweAmt} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>REASON (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweReason} onChangeText={setOweReason} placeholder="Reason..." placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE BORROWED</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweBorrowed} onChangeText={setOweBorrowed} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DUE DATE (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweDue} onChangeText={setOweDue} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]} onPress={handleAddOwe}>
+          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>ADD OWE ENTRY</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+
+      <SimpleOverlay visible={showAddLend} onClose={() => setShowAddLend(false)} C={C} title="ADD LEND ENTRY">
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>PERSON NAME</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendName} onChangeText={setLendName} placeholder="Name" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendAmt} onChangeText={setLendAmt} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>REASON (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendReason} onChangeText={setLendReason} placeholder="Reason..." placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE LENT</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendDate} onChangeText={setLendDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>EXPECTED RETURN DATE (OPTIONAL)</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendReturn} onChangeText={setLendReturn} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15` }]} onPress={handleAddLend}>
+          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>ADD LEND ENTRY</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+    </ScrollView>
+  );
+}
+
+function AssetRow({
+  label,
+  value,
+  isAuto,
+  C,
+  formatAmount,
+  color,
+  onEdit,
+  onDelete,
+}: {
+  label: string;
+  value: number;
+  isAuto?: boolean;
+  C: ReturnType<typeof getThemeColors>;
+  formatAmount: (n: number) => string;
+  color?: string;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <View style={styles.assetRow}>
+      <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Text style={[styles.assetLabel, { color: C.cipherWhite }]}>{label}</Text>
+        {isAuto && (
+          <View style={[styles.autoBadge, { borderColor: C.ghostText }]}>
+            <Text style={[styles.autoBadgeText, { color: C.ghostText }]}>AUTO</Text>
+          </View>
+        )}
+      </View>
+      <Text style={[styles.assetValue, { color: color ?? C.creditGreen }]}>{formatAmount(value)}</Text>
+      {!isAuto && onEdit && (
+        <TouchableOpacity onPress={onEdit} style={{ marginLeft: 8 }}>
+          <Feather name="edit-2" size={12} color={C.ghostText} />
+        </TouchableOpacity>
+      )}
+      {!isAuto && onDelete && (
+        <TouchableOpacity onPress={onDelete} style={{ marginLeft: 6 }}>
+          <Feather name="trash-2" size={12} color={C.ghostText} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function GoalSelector({
+  goals,
+  selected,
+  onSelect,
+  C,
+}: {
+  goals: SavingsGoal[];
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  C: ReturnType<typeof getThemeColors>;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        <TouchableOpacity
+          style={[styles.goalChip, { borderColor: selected === null ? C.amberSignal : C.wireGray, backgroundColor: selected === null ? `${C.amberSignal}15` : "transparent" }]}
+          onPress={() => onSelect(null)}
+        >
+          <Text style={[styles.goalChipText, { color: selected === null ? C.amberSignal : C.slateText }]}>General Pool</Text>
+        </TouchableOpacity>
+        {goals.map((g) => (
+          <TouchableOpacity
+            key={g.id}
+            style={[styles.goalChip, { borderColor: selected === g.id ? C.amberSignal : C.wireGray, backgroundColor: selected === g.id ? `${C.amberSignal}15` : "transparent" }]}
+            onPress={() => onSelect(g.id)}
+          >
+            <Text style={[styles.goalChipText, { color: selected === g.id ? C.amberSignal : C.slateText }]}>{g.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function SimpleOverlay({
+  visible,
+  onClose,
+  title,
+  children,
+  C,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  C: ReturnType<typeof getThemeColors>;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.overlayBackdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+        <View style={[styles.overlaySheet, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+          <View style={styles.overlayHeader}>
+            <Text style={[styles.overlayTitle, { color: C.amberSignal }]}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Feather name="x" size={18} color={C.slateText} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ gap: 10, paddingBottom: 20 }}>{children}</View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  scroll: { flex: 1 },
+  content: { padding: 16, gap: 16, paddingBottom: 40 },
+  nwCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 20,
+    gap: 8,
+    alignItems: "center",
+  },
+  nwHeading: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+  },
+  nwValue: {
+    fontFamily: "JetBrainsMono_600SemiBold",
+    fontSize: 28,
+  },
+  nwSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    marginTop: 8,
+  },
+  nwSubItem: { alignItems: "center" },
+  nwSubLabel: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+  nwSubAmount: {
+    fontFamily: "JetBrainsMono_600SemiBold",
+    fontSize: 14,
+    marginTop: 2,
+  },
+  nwSubDivider: { width: 1, height: 32 },
+  card: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 16,
+    gap: 12,
+  },
+  sLabel: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    color: "#3a4a60",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+  },
+  collapsibleHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  assetList: { gap: 10 },
+  assetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  assetLabel: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 12,
+  },
+  assetValue: {
+    fontFamily: "JetBrainsMono_600SemiBold",
+    fontSize: 13,
+  },
+  autoBadge: {
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  autoBadgeText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 7,
+    letterSpacing: 0.5,
+  },
+  addAssetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 12,
+    justifyContent: "center",
+  },
+  addAssetBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  savingsSummary: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 14,
+    alignItems: "center",
+    gap: 4,
+  },
+  savingsLabel: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+  savingsAmount: {
+    fontFamily: "JetBrainsMono_600SemiBold",
+    fontSize: 22,
+  },
+  savingsActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  savingsBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 12,
+  },
+  savingsBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  goalsList: { gap: 10 },
+  goalCard: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 12,
+    gap: 6,
+  },
+  goalTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  goalLabel: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 13,
+  },
+  goalRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  goalMeta: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginTop: 2,
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  addGoalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderStyle: "dashed" as any,
+    borderRadius: 6,
+    paddingVertical: 10,
+    justifyContent: "center",
+  },
+  addGoalBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  sectionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  sectionAddBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  oweSummary: {
+    fontFamily: "JetBrainsMono_600SemiBold",
+    fontSize: 14,
+  },
+  oweCard: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 12,
+    gap: 10,
+  },
+  oweTop: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  oweName: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 13,
+  },
+  oweReason: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  oweDate: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    marginTop: 2,
+  },
+  oweRight: { alignItems: "flex-end", gap: 2 },
+  oweRemaining: {
+    fontFamily: "JetBrainsMono_600SemiBold",
+    fontSize: 14,
+  },
+  oweOriginal: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+  },
+  overdueLabel: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  repayTrigger: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  repayTriggerText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  repayForm: { gap: 8 },
+  repayInput: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 13,
+    outlineStyle: "none" as any,
+  },
+  repayBtns: { flexDirection: "row", gap: 8 },
+  repayBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  repayBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  settledToggle: { alignItems: "center", paddingVertical: 6 },
+  settledToggleText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  lendToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  lendToggleLabel: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  excludedNote: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    fontStyle: "italic",
+  },
+  emptyText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 12,
+    textAlign: "center",
+    paddingVertical: 8,
+  },
+  badge: {
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 8,
+    letterSpacing: 0.5,
+  },
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(7,9,14,0.85)",
+    justifyContent: "flex-end",
+  },
+  overlaySheet: {
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderWidth: 1,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  overlayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  overlayTitle: {
+    fontFamily: "Syne_700Bold",
+    fontSize: 14,
+    letterSpacing: 2.5,
+  },
+  overlayLabel: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 9,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  overlayInput: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 15,
+    outlineStyle: "none" as any,
+  },
+  overlaySubmit: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  overlaySubmitText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 11,
+    letterSpacing: 1.2,
+  },
+  typeToggle: { flexDirection: "row", gap: 8 },
+  typeBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  typeBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  goalChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 6,
+  },
+  goalChipText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 12,
+  },
+});

@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "LEDGER",
+    "slug": "ledger",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "ledger",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#07090e",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#07090e"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ryanshelby.ledger",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Allow LEDGER to use Face ID for secure unlock.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "backgroundColor": "#07090e",
+      "package": "com.ryanshelby.ledger",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/images/adaptive-icon-background.png",
+        "backgroundColor": "#07090E",
+        "monochromeImage": "./assets/images/monochrome-icon.png"
+      },
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png",
+      "backgroundColor": "#07090e"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      "expo-sqlite",
+      "expo-document-picker",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow LEDGER to use Face ID for secure unlock."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
