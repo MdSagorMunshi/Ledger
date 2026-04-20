@@ -8,7 +8,12 @@ import React, {
   useEffect,
 } from "react";
 import { AppState, Platform } from "react-native";
-import { loadStoredPin, loadVault, saveVault, deleteVault } from "@/utils/storage";
+import {
+  loadStoredSecurityState,
+  loadVault,
+  saveVault,
+  deleteVault,
+} from "@/utils/storage";
 
 export type TransactionType = "income" | "expense";
 
@@ -311,11 +316,15 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   // Keep pinRef in sync
   useEffect(() => { pinRef.current = pin; }, [pin]);
 
-  // Hydrate: load stored PIN on mount so lock screen knows if user exists
+  // Hydrate security state on mount so the lock screen can prompt for biometrics immediately.
   useEffect(() => {
     (async () => {
-      const storedPin = await loadStoredPin();
-      if (storedPin) setPin(storedPin);
+      const storedSecurity = await loadStoredSecurityState();
+      if (storedSecurity.pin) {
+        setPin(storedSecurity.pin);
+        pinRef.current = storedSecurity.pin;
+      }
+      setBiometricEnabledState(storedSecurity.biometricEnabled);
       setIsHydrated(true);
     })();
   }, []);

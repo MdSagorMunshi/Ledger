@@ -17,8 +17,8 @@ const C = colors.light;
 const APP_INFO = {
   name: "LEDGER",
   tagline: "Local-First Finance Tracker",
-  version: "1.0.0",
-  lastUpdate: "2026-04-20",
+  version: "2.0.0",
+  lastUpdate: "2026-04-21",
   license: "MIT",
   sourceUrl: "https://github.com/MdSagorMunshi/ledger",
 };
@@ -39,6 +39,29 @@ const TECH_STACK = [
   { label: "EXPORT SECURITY", value: "AES-GCM snapshots" },
   { label: "KEY DERIV.", value: "PBKDF2 SHA-256" },
   { label: "CHARTS", value: "react-native-svg" },
+];
+
+const CHANGELOGS = [
+  {
+    version: "2.0.0",
+    date: "2026-04-21",
+    label: "CURRENT",
+    entries: [
+      "Fixed Android export/share failures caused by Expo module version mismatch.",
+      "Fixed biometric unlock so the lock screen prompts immediately when biometrics are enabled.",
+      "Cleaned up Bun dependency tracking so the lockfile is committed with app changes.",
+    ],
+  },
+  {
+    version: "1.0.0",
+    date: "2026-04-20",
+    label: "LAUNCH",
+    entries: [
+      "Released the offline-first ledger with local SQLite storage and PIN protection.",
+      "Added transactions, savings, budgets, debts, lending, recurring entries, and analytics.",
+      "Added encrypted export/import, monthly reports, and local auto-backup support.",
+    ],
+  },
 ];
 
 function SectionHeader({ title }: { title: string }) {
@@ -171,6 +194,32 @@ export default function AboutScreen() {
             <DataRow label={item.label} value={item.value} />
             {idx < TECH_STACK.length - 1 && <View style={s.divider} />}
           </React.Fragment>
+        ))}
+      </View>
+
+      <SectionHeader title="CHANGELOG" />
+      <View style={s.changelogList}>
+        {CHANGELOGS.map((release) => (
+          <View key={release.version} style={s.changelogCard}>
+            <View style={s.changelogHeader}>
+              <View>
+                <Text style={s.changelogVersion}>v{release.version}</Text>
+                <Text style={s.changelogDate}>{release.date}</Text>
+              </View>
+              <View style={s.changelogBadge}>
+                <Text style={s.changelogBadgeText}>{release.label}</Text>
+              </View>
+            </View>
+
+            <View style={s.changelogEntries}>
+              {release.entries.map((entry) => (
+                <View key={entry} style={s.changelogEntryRow}>
+                  <View style={s.changelogDot} />
+                  <Text style={s.changelogEntryText}>{entry}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
         ))}
       </View>
 
@@ -359,6 +408,72 @@ const s = StyleSheet.create({
   },
   linkValueClickable: {
     color: C.amberSignal,
+  },
+  changelogList: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  changelogCard: {
+    backgroundColor: C.inkSurface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.wireGray,
+    padding: 16,
+    gap: 14,
+  },
+  changelogHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  changelogVersion: {
+    fontFamily: "Syne_700Bold",
+    fontSize: 18,
+    color: C.amberSignal,
+    letterSpacing: 1.5,
+  },
+  changelogDate: {
+    marginTop: 4,
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    color: C.ghostText,
+  },
+  changelogBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.wireGray,
+    backgroundColor: C.wireDim,
+  },
+  changelogBadgeText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 8,
+    color: C.cipherWhite,
+    letterSpacing: 1.4,
+  },
+  changelogEntries: {
+    gap: 10,
+  },
+  changelogEntryRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  changelogDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: C.amberSignal,
+    marginTop: 6,
+  },
+  changelogEntryText: {
+    flex: 1,
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    lineHeight: 18,
+    color: C.cipherWhite,
   },
   privacyBlock: {
     padding: 16,

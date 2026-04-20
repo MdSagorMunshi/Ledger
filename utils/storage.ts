@@ -772,6 +772,31 @@ export async function loadStoredPin(): Promise<string | null> {
   }
 }
 
+export async function loadStoredSecurityState(): Promise<{
+  pin: string | null;
+  biometricEnabled: boolean;
+}> {
+  if (Platform.OS === "web") {
+    return {
+      pin: null,
+      biometricEnabled: false,
+    };
+  }
+  try {
+    const db = await getDb();
+    const settings = await loadSettingsRow(db);
+    return {
+      pin: settings.pin ?? null,
+      biometricEnabled: toBool(settings.biometric_enabled),
+    };
+  } catch {
+    return {
+      pin: null,
+      biometricEnabled: false,
+    };
+  }
+}
+
 export async function loadVault(pin: string): Promise<Record<string, any> | null> {
   if (Platform.OS === "web") return null;
   try {
