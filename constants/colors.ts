@@ -65,12 +65,26 @@ const colors = {
     debitRed: "#ef4444",
   },
 
+  oled: {
+    forgeBlack: "#000000",
+    vaultDark: "#000000",
+    inkSurface: "#000000",
+    wireGray: "#1f2937",
+    wireDim: "#000000",
+    cipherWhite: "#e2e8f0",
+    slateText: "#7a8aa0",
+    ghostText: "#3a4a60",
+    amberSignal: "#f59e0b",
+    creditGreen: "#22c55e",
+    debitRed: "#ef4444",
+  },
+
   radius: 8,
 };
 
 export default colors;
 
-export function getThemeColors(theme: "dark" | "dim") {
+export function getThemeColors(theme: "dark" | "dim" | "oled") {
   if (theme === "dim") {
     return {
       ...colors.light,
@@ -79,6 +93,18 @@ export function getThemeColors(theme: "dark" | "dim") {
       inkSurface: colors.dim.inkSurface,
       background: colors.dim.forgeBlack,
       card: colors.dim.vaultDark,
+    };
+  }
+  if (theme === "oled") {
+    return {
+      ...colors.light,
+      forgeBlack: colors.oled.forgeBlack,
+      vaultDark: colors.oled.vaultDark,
+      inkSurface: colors.oled.inkSurface,
+      wireGray: colors.oled.wireGray,
+      wireDim: colors.oled.wireDim,
+      background: colors.oled.forgeBlack,
+      card: colors.oled.vaultDark,
     };
   }
   return colors.light;

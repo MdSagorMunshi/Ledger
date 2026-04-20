@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import colors from "@/constants/colors";
-import { Transaction } from "@/context/LedgerContext";
+import { getThemeColors } from "@/constants/colors";
+import { Transaction, useLedger } from "@/context/LedgerContext";
 
 interface MonthData {
   month: string;
@@ -31,6 +31,8 @@ function getMonthLabel(ym: string): string {
 }
 
 export function BarChart({ transactions, formatAmount }: BarChartProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
   const months = getLast6Months();
 
   const data: MonthData[] = months.map((ym) => {
@@ -50,7 +52,7 @@ export function BarChart({ transactions, formatAmount }: BarChartProps) {
   if (distinctMonths < 2) {
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderText}>
+        <Text style={[styles.placeholderText, { color: C.ghostText }]}>
           Add more entries to see your monthly trend
         </Text>
       </View>
@@ -101,12 +103,12 @@ export function BarChart({ transactions, formatAmount }: BarChartProps) {
       </View>
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.light.creditGreen }]} />
-          <Text style={styles.legendText}>Income</Text>
+          <View style={[styles.legendDot, { backgroundColor: C.creditGreen }]} />
+          <Text style={[styles.legendText, { color: C.slateText }]}>Income</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.light.debitRed }]} />
-          <Text style={styles.legendText}>Expense</Text>
+          <View style={[styles.legendDot, { backgroundColor: C.debitRed }]} />
+          <Text style={[styles.legendText, { color: C.slateText }]}>Expense</Text>
         </View>
       </View>
     </View>
@@ -121,7 +123,6 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 12,
-    color: colors.light.ghostText,
     textAlign: "center",
   },
   chart: {
@@ -149,16 +150,16 @@ const styles = StyleSheet.create({
   },
   incomeBar: {
     backgroundColor: "rgba(34,197,94,0.20)",
-    borderTopColor: colors.light.creditGreen,
+    borderTopColor: "#22c55e",
   },
   expenseBar: {
     backgroundColor: "rgba(239,68,68,0.20)",
-    borderTopColor: colors.light.debitRed,
+    borderTopColor: "#ef4444",
   },
   monthLabel: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 9,
-    color: colors.light.slateText,
+    color: "#7a8aa0",
     marginTop: 2,
   },
   legend: {
@@ -180,6 +181,5 @@ const styles = StyleSheet.create({
   legendText: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-    color: colors.light.slateText,
   },
 });

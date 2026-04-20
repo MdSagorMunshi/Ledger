@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { Feather } from "@expo/vector-icons";
-import colors from "@/constants/colors";
-import { Transaction } from "@/context/LedgerContext";
+import { getThemeColors } from "@/constants/colors";
+import { Transaction, useLedger } from "@/context/LedgerContext";
 import { isEncryptedPayload, decryptData } from "@/utils/crypto";
 import { parseImport } from "@/utils/export";
 
@@ -59,6 +59,8 @@ async function pickAndReadFile(): Promise<string | null> {
 }
 
 export function useImport({ onImported }: ImportFlowProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [pendingEncrypted, setPendingEncrypted] = useState<object | null>(null);
   const [pinInput, setPinInput] = useState("");
@@ -118,30 +120,40 @@ export function useImport({ onImported }: ImportFlowProps) {
       <TouchableWithoutFeedback onPress={() => setShowPinPrompt(false)}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modal}>
+            <View style={[styles.modal, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
               <View style={styles.header}>
-                <Text style={styles.title}>DECRYPT FILE</Text>
+                <Text style={[styles.title, { color: C.cipherWhite }]}>DECRYPT FILE</Text>
                 <TouchableOpacity onPress={() => setShowPinPrompt(false)}>
-                  <Feather name="x" size={18} color={colors.light.slateText} />
+                  <Feather name="x" size={18} color={C.slateText} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.desc}>
+              <Text style={[styles.desc, { color: C.slateText }]}>
                 Enter the PIN used when exporting this file
               </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: C.forgeBlack,
+                    borderColor: C.wireGray,
+                    color: C.cipherWhite,
+                  },
+                ]}
                 value={pinInput}
                 onChangeText={setPinInput}
                 placeholder="Enter PIN"
-                placeholderTextColor={colors.light.ghostText}
+                placeholderTextColor={C.ghostText}
                 keyboardType="numeric"
                 secureTextEntry
                 maxLength={6}
                 onSubmitEditing={submitPin}
               />
-              {!!pinError && <Text style={styles.error}>{pinError}</Text>}
-              <TouchableOpacity style={styles.btn} onPress={submitPin}>
-                <Text style={styles.btnLabel}>DECRYPT & IMPORT</Text>
+              {!!pinError && <Text style={[styles.error, { color: C.debitRed }]}>{pinError}</Text>}
+              <TouchableOpacity
+                style={[styles.btn, { borderColor: C.amberSignal }]}
+                onPress={submitPin}
+              >
+                <Text style={[styles.btnLabel, { color: C.amberSignal }]}>DECRYPT & IMPORT</Text>
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
@@ -162,9 +174,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modal: {
-    backgroundColor: colors.light.vaultDark,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     borderRadius: 8,
     padding: 20,
     width: "100%",
@@ -179,34 +189,27 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 12,
-    color: colors.light.cipherWhite,
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
   desc: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 12,
-    color: colors.light.slateText,
   },
   input: {
-    backgroundColor: colors.light.forgeBlack,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     borderRadius: 6,
     padding: 12,
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 16,
-    color: colors.light.cipherWhite,
   },
   error: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-    color: colors.light.debitRed,
   },
   btn: {
     backgroundColor: "rgba(245,158,11,0.15)",
     borderWidth: 1,
-    borderColor: colors.light.amberSignal,
     borderRadius: 6,
     padding: 14,
     alignItems: "center",
@@ -214,7 +217,6 @@ const styles = StyleSheet.create({
   btnLabel: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 11,
-    color: colors.light.amberSignal,
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },

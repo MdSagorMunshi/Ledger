@@ -1,8 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
-import colors from "@/constants/colors";
-import { Transaction } from "@/context/LedgerContext";
+import { getThemeColors } from "@/constants/colors";
+import { Transaction, useLedger } from "@/context/LedgerContext";
 
 interface DonutChartProps {
   transactions: Transaction[];
@@ -16,6 +16,8 @@ interface Segment {
 }
 
 export function DonutChart({ transactions, formatAmount }: DonutChartProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
   const expenses = transactions.filter((tx) => tx.type === "expense");
   if (expenses.length === 0) return null;
 
@@ -25,7 +27,7 @@ export function DonutChart({ transactions, formatAmount }: DonutChartProps) {
   });
 
   const total = Object.values(byCategory).reduce((s, v) => s + v, 0);
-  const chartColors = colors.light.chartColors;
+  const chartColors = C.chartColors;
 
   const segments: Segment[] = Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
@@ -77,8 +79,12 @@ export function DonutChart({ transactions, formatAmount }: DonutChartProps) {
         {segments.map((seg, i) => (
           <View key={i} style={styles.legendRow}>
             <View style={[styles.dot, { backgroundColor: seg.color }]} />
-            <Text style={styles.catName} numberOfLines={1}>{seg.category}</Text>
-            <Text style={styles.catAmount}>{formatAmount(seg.amount)}</Text>
+            <Text style={[styles.catName, { color: C.slateText }]} numberOfLines={1}>
+              {seg.category}
+            </Text>
+            <Text style={[styles.catAmount, { color: C.cipherWhite }]}>
+              {formatAmount(seg.amount)}
+            </Text>
           </View>
         ))}
       </View>
@@ -115,13 +121,11 @@ const styles = StyleSheet.create({
   catName: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 12,
-    color: colors.light.slateText,
     flex: 1,
   },
   catAmount: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 12,
-    color: colors.light.cipherWhite,
     textAlign: "right",
   },
 });

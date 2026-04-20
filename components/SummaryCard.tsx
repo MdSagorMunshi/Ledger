@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import colors from "@/constants/colors";
+import { getThemeColors } from "@/constants/colors";
+import { useLedger } from "@/context/LedgerContext";
 
 interface SummaryCardProps {
   label: string;
@@ -10,9 +11,12 @@ interface SummaryCardProps {
 }
 
 export function SummaryCard({ label, amount, color, flex = 1 }: SummaryCardProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
+
   return (
-    <View style={[styles.card, { flex }]}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.card, { flex, backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+      <Text style={[styles.label, { color: C.ghostText }]}>{label}</Text>
       <Text style={[styles.amount, { color }]}>{amount}</Text>
     </View>
   );
@@ -20,16 +24,13 @@ export function SummaryCard({ label, amount, color, flex = 1 }: SummaryCardProps
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.light.vaultDark,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     borderRadius: 8,
     padding: 16,
   },
   label: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 10,
-    color: colors.light.ghostText,
     textTransform: "uppercase",
     letterSpacing: 1.5,
     marginBottom: 8,

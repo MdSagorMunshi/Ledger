@@ -631,9 +631,10 @@ export default function SettingsScreen() {
     { label: "15 min", value: 15 },
   ];
 
-  const themeOptions: { label: string; value: "dark" | "dim" }[] = [
+  const themeOptions: { label: string; value: "dark" | "dim" | "oled" }[] = [
     { label: "Dark", value: "dark" },
     { label: "Dim", value: "dim" },
+    { label: "OLED", value: "oled" },
   ];
 
   const lastBackupLabel = lastBackupTime
@@ -922,7 +923,11 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>THEME</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {appSettings.theme === "dark" ? "Deep black background" : "Softer slate tones"}
+              {appSettings.theme === "dark"
+                ? "Deep black background"
+                : appSettings.theme === "dim"
+                ? "Softer slate tones"
+                : "Pure black OLED surfaces"}
             </Text>
           </View>
           <PillGroup

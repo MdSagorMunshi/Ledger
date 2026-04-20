@@ -7,7 +7,8 @@ import {
   Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import colors from "@/constants/colors";
+import { getThemeColors } from "@/constants/colors";
+import { useLedger } from "@/context/LedgerContext";
 
 interface PinKeypadProps {
   onPress: (digit: string) => void;
@@ -23,6 +24,9 @@ const KEYS = [
 ];
 
 export function PinKeypad({ onPress, onBackspace, disabled }: PinKeypadProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
+
   const handleKey = (key: string) => {
     if (disabled) return;
     if (key === "" ) return;
@@ -44,7 +48,7 @@ export function PinKeypad({ onPress, onBackspace, disabled }: PinKeypadProps) {
             return (
               <TouchableOpacity
                 key={ki}
-                style={styles.key}
+                style={[styles.key, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}
                 onPress={() => handleKey(key)}
                 activeOpacity={0.7}
               >
@@ -52,10 +56,10 @@ export function PinKeypad({ onPress, onBackspace, disabled }: PinKeypadProps) {
                   <Feather
                     name="delete"
                     size={20}
-                    color={colors.light.cipherWhite}
+                    color={C.cipherWhite}
                   />
                 ) : (
-                  <Text style={styles.keyText}>{key}</Text>
+                  <Text style={[styles.keyText, { color: C.cipherWhite }]}>{key}</Text>
                 )}
               </TouchableOpacity>
             );
@@ -82,9 +86,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 10,
-    backgroundColor: colors.light.vaultDark,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     alignItems: "center",
     justifyContent: "center",
     ...(Platform.OS === "web"
@@ -98,6 +100,5 @@ const styles = StyleSheet.create({
   keyText: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 22,
-    color: colors.light.cipherWhite,
   },
 });

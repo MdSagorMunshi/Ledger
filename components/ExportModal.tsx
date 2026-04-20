@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import colors from "@/constants/colors";
+import { getThemeColors } from "@/constants/colors";
 import { useLedger } from "@/context/LedgerContext";
 import { exportPlain, exportEncrypted } from "@/utils/export";
 
@@ -35,6 +35,7 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
   } = useLedger();
 
   const [encrypting, setEncrypting] = useState(false);
+  const C = getThemeColors(appSettings.theme);
 
   const buildState = () => ({
     transactions,
@@ -72,38 +73,46 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
     }
   };
 
-  const C = colors.light;
-
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modal}>
+            <View style={[styles.modal, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
               <View style={styles.header}>
-                <Text style={styles.title}>EXPORT DATA</Text>
+                <Text style={[styles.title, { color: C.cipherWhite }]}>EXPORT DATA</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Feather name="x" size={18} color={C.slateText} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.subtitle, { color: C.slateText }]}>
                 {transactions.length} TRANSACTIONS · V1 FORMAT
               </Text>
 
-              <TouchableOpacity style={styles.btn} onPress={handlePlain}>
-                <Text style={styles.btnLabel}>PLAIN JSON</Text>
-                <Text style={styles.btnDesc}>Readable by any text editor · Full v1 snapshot</Text>
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: C.inkSurface, borderColor: C.wireGray }]}
+                onPress={handlePlain}
+              >
+                <Text style={[styles.btnLabel, { color: C.cipherWhite }]}>PLAIN JSON</Text>
+                <Text style={[styles.btnDesc, { color: C.slateText }]}>
+                  Readable by any text editor · Full v1 snapshot
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.btn, styles.btnAmber]}
+                style={[
+                  styles.btn,
+                  { backgroundColor: C.inkSurface, borderColor: C.amberSignal },
+                ]}
                 onPress={handleEncrypted}
                 disabled={encrypting}
               >
                 <Text style={[styles.btnLabel, { color: C.amberSignal }]}>
                   {encrypting ? "ENCRYPTING..." : "ENCRYPTED"}
                 </Text>
-                <Text style={styles.btnDesc}>Secured with your PIN via AES-GCM</Text>
+                <Text style={[styles.btnDesc, { color: C.slateText }]}>
+                  Secured with your PIN via AES-GCM
+                </Text>
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
@@ -122,9 +131,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modal: {
-    backgroundColor: colors.light.vaultDark,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     borderRadius: 8,
     padding: 20,
     width: "100%",
@@ -139,34 +146,27 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 12,
-    color: colors.light.cipherWhite,
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
   subtitle: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-    color: colors.light.slateText,
   },
   btn: {
-    backgroundColor: colors.light.inkSurface,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     borderRadius: 6,
     padding: 14,
     gap: 4,
   },
-  btnAmber: { borderColor: colors.light.amberSignal },
   btnLabel: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 11,
-    color: colors.light.cipherWhite,
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
   btnDesc: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-    color: colors.light.slateText,
   },
 });

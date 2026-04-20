@@ -154,7 +154,7 @@ export interface RecurringTemplate {
 
 export interface AppSettings {
   autoLockMinutes: number | null;
-  theme: "dark" | "dim";
+  theme: "dark" | "dim" | "oled";
   defaultCurrencyCode: string;
 }
 

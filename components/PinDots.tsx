@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, Animated } from "react-native";
-import colors from "@/constants/colors";
+import { getThemeColors } from "@/constants/colors";
+import { useLedger } from "@/context/LedgerContext";
 
 interface PinDotsProps {
   length: number;
@@ -9,6 +10,8 @@ interface PinDotsProps {
 }
 
 export function PinDots({ length, filled, shake }: PinDotsProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -29,13 +32,19 @@ export function PinDots({ length, filled, shake }: PinDotsProps) {
       style={[styles.row, { transform: [{ translateX: shakeAnim }] }]}
     >
       {Array.from({ length }).map((_, i) => (
-        <DotItem key={i} filled={i < filled} />
+        <DotItem key={i} filled={i < filled} C={C} />
       ))}
     </Animated.View>
   );
 }
 
-function DotItem({ filled }: { filled: boolean }) {
+function DotItem({
+  filled,
+  C,
+}: {
+  filled: boolean;
+  C: ReturnType<typeof getThemeColors>;
+}) {
   const anim = useRef(new Animated.Value(0)).current;
   const prevFilled = useRef(false);
 
@@ -58,12 +67,12 @@ function DotItem({ filled }: { filled: boolean }) {
 
   const bgColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ["transparent", colors.light.amberSignal],
+    outputRange: ["transparent", C.amberSignal],
   });
 
   const borderColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [colors.light.wireGray, colors.light.amberSignal],
+    outputRange: [C.wireGray, C.amberSignal],
   });
 
   return (

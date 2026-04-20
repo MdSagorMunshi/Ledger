@@ -12,9 +12,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useLedger, TransactionType } from "@/context/LedgerContext";
 import { TransactionRow } from "@/components/TransactionRow";
-import colors from "@/constants/colors";
-
-const C = colors.light;
+import { getThemeColors } from "@/constants/colors";
 
 type FilterType = "all" | TransactionType;
 type DateRange = "all" | "today" | "week" | "month" | "year" | "custom";
@@ -63,7 +61,9 @@ function todayStr(): string {
 }
 
 export default function History() {
-  const { transactions, removeTransaction, formatAmount } = useLedger();
+  const { transactions, removeTransaction, formatAmount, appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
+  const styles = getStyles(C);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
@@ -257,7 +257,7 @@ export default function History() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (C: ReturnType<typeof getThemeColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.forgeBlack },
   filterBar: {
     backgroundColor: C.vaultDark,

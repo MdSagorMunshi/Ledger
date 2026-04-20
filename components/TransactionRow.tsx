@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import colors from "@/constants/colors";
-import { Transaction } from "@/context/LedgerContext";
+import { getThemeColors } from "@/constants/colors";
+import { Transaction, useLedger } from "@/context/LedgerContext";
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -12,16 +12,16 @@ interface TransactionRowProps {
   showDelete?: boolean;
 }
 
-function getSubtypeDisplay(tx: Transaction) {
+function getSubtypeDisplay(tx: Transaction, C: ReturnType<typeof getThemeColors>) {
   switch (tx.subtype) {
     case "savings_transfer":
-      return { iconName: "archive" as const, label: "→ Savings", color: colors.light.slateText };
+      return { iconName: "archive" as const, label: "→ Savings", color: C.slateText };
     case "savings_withdrawal":
-      return { iconName: "archive" as const, label: "← Savings", color: colors.light.slateText };
+      return { iconName: "archive" as const, label: "← Savings", color: C.slateText };
     case "debt_repayment":
-      return { iconName: "credit-card" as const, label: "Debt Repayment", color: colors.light.debitRed };
+      return { iconName: "credit-card" as const, label: "Debt Repayment", color: C.debitRed };
     case "lend_returned":
-      return { iconName: "corner-down-left" as const, label: "Lend Returned", color: colors.light.creditGreen };
+      return { iconName: "corner-down-left" as const, label: "Lend Returned", color: C.creditGreen };
     default:
       return null;
   }
@@ -34,13 +34,15 @@ export function TransactionRow({
   highlight,
   showDelete,
 }: TransactionRowProps) {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const isIncome = transaction.type === "income";
 
-  const subtypeDisplay = getSubtypeDisplay(transaction);
-  const amountColor = subtypeDisplay?.color ?? (isIncome ? colors.light.creditGreen : colors.light.debitRed);
+  const subtypeDisplay = getSubtypeDisplay(transaction, C);
+  const amountColor = subtypeDisplay?.color ?? (isIncome ? C.creditGreen : C.debitRed);
   const prefix = subtypeDisplay
-    ? subtypeDisplay.color === colors.light.creditGreen
+    ? subtypeDisplay.color === C.creditGreen
       ? "+"
       : "-"
     : isIncome
@@ -68,11 +70,11 @@ export function TransactionRow({
   });
 
   return (
-    <Animated.View style={[styles.row, { backgroundColor: bgColor }]}>
+    <Animated.View style={[styles.row, { backgroundColor: bgColor, borderBottomColor: C.wireDim }]}>
       <Feather name={iconName} size={20} color={amountColor} style={styles.icon} />
       <View style={styles.info}>
         <View style={styles.categoryRow}>
-          <Text style={styles.category}>{transaction.category}</Text>
+          <Text style={[styles.category, { color: C.cipherWhite }]}>{transaction.category}</Text>
           {subtypeDisplay && (
             <View style={[styles.subtypeBadge, { borderColor: amountColor }]}>
               <Text style={[styles.subtypeBadgeText, { color: amountColor }]}>{subtypeDisplay.label}</Text>
@@ -80,9 +82,11 @@ export function TransactionRow({
           )}
         </View>
         {!!transaction.note && (
-          <Text style={styles.note} numberOfLines={1}>{transaction.note}</Text>
+          <Text style={[styles.note, { color: C.slateText }]} numberOfLines={1}>
+            {transaction.note}
+          </Text>
         )}
-        <Text style={styles.date}>
+        <Text style={[styles.date, { color: C.ghostText }]}>
           {transaction.date}{transaction.time ? `  ·  ${transaction.time}` : ""}
         </Text>
       </View>
@@ -96,7 +100,7 @@ export function TransactionRow({
             style={styles.deleteBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="trash-2" size={14} color={colors.light.ghostText} />
+            <Feather name="trash-2" size={14} color={C.ghostText} />
           </TouchableOpacity>
         )}
       </View>
@@ -111,7 +115,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: colors.light.wireDim,
   },
   icon: { marginRight: 12 },
   info: { flex: 1, gap: 1 },
@@ -124,7 +127,6 @@ const styles = StyleSheet.create({
   category: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 13,
-    color: colors.light.cipherWhite,
   },
   subtypeBadge: {
     borderWidth: 1,
@@ -140,12 +142,10 @@ const styles = StyleSheet.create({
   note: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
-    color: colors.light.slateText,
   },
   date: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 10,
-    color: colors.light.ghostText,
   },
   right: {
     alignItems: "flex-end",

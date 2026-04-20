@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import Svg, { Path } from "react-native-svg";
 import { useLedger } from "@/context/LedgerContext";
 import {
   computeSpendingVelocity,
@@ -16,8 +16,6 @@ import {
   computeIncomeStability,
 } from "@/utils/analytics";
 import { getThemeColors } from "@/constants/colors";
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
 
 function SLabel({ label }: { label: string }) {
   return <Text style={styles.sLabel}>{label}</Text>;
@@ -49,14 +47,20 @@ function Sparkline({
 
   return (
     <View style={{ width, height }}>
-      <svg
+      <Svg
         width={width}
         height={height}
-        style={{ display: "flex" } as any}
         viewBox={`0 0 ${width} ${height}`}
       >
-        <path d={d} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+        <Path
+          d={d}
+          stroke={color}
+          strokeWidth={1.5}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
     </View>
   );
 }

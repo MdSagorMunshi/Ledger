@@ -10,9 +10,8 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import colors from "@/constants/colors";
-
-const C = colors.light;
+import { getThemeColors } from "@/constants/colors";
+import { useLedger } from "@/context/LedgerContext";
 
 const APP_INFO = {
   name: "LEDGER",
@@ -49,7 +48,9 @@ const CHANGELOGS = [
     entries: [
       "Fixed Android export/share failures caused by Expo module version mismatch.",
       "Fixed biometric unlock so the lock screen prompts immediately when biometrics are enabled.",
-      "Cleaned up Bun dependency tracking so the lockfile is committed with app changes.",
+      "Fixed the Analytics screen crash by replacing the broken sparkline renderer.",
+      "Fixed Monthly Report printing by opening the native print or Save as PDF dialog with a PDF fallback.",
+      "Added a new OLED theme with pure black app and component backgrounds.",
     ],
   },
   {
@@ -64,7 +65,14 @@ const CHANGELOGS = [
   },
 ];
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({
+  title,
+  C,
+}: {
+  title: string;
+  C: ReturnType<typeof getThemeColors>;
+}) {
+  const s = getStyles(C);
   return (
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
@@ -73,7 +81,18 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function DataRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function DataRow({
+  label,
+  value,
+  mono,
+  C,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  C: ReturnType<typeof getThemeColors>;
+}) {
+  const s = getStyles(C);
   return (
     <View style={s.dataRow}>
       <Text style={s.dataLabel}>{label}</Text>
@@ -87,12 +106,15 @@ function LinkRow({
   label,
   value,
   url,
+  C,
 }: {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   value: string;
   url?: string;
+  C: ReturnType<typeof getThemeColors>;
 }) {
+  const s = getStyles(C);
   const handlePress = () => {
     if (url) Linking.openURL(url);
   };
@@ -115,6 +137,10 @@ function LinkRow({
 }
 
 export default function AboutScreen() {
+  const { appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
+  const s = getStyles(C);
+
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={s.topBar}>
@@ -135,34 +161,36 @@ export default function AboutScreen() {
         </View>
       </View>
 
-      <SectionHeader title="APP DETAILS" />
+      <SectionHeader title="APP DETAILS" C={C} />
       <View style={s.section}>
-        <DataRow label="VERSION" value={`v${APP_INFO.version}`} mono />
+        <DataRow label="VERSION" value={`v${APP_INFO.version}`} mono C={C} />
         <View style={s.divider} />
-        <DataRow label="LAST UPDATE" value={APP_INFO.lastUpdate} mono />
+        <DataRow label="LAST UPDATE" value={APP_INFO.lastUpdate} mono C={C} />
         <View style={s.divider} />
-        <DataRow label="LICENSE" value={APP_INFO.license} />
+        <DataRow label="LICENSE" value={APP_INFO.license} C={C} />
       </View>
 
-      <SectionHeader title="SOURCE CODE" />
+      <SectionHeader title="SOURCE CODE" C={C} />
       <View style={s.section}>
         <LinkRow
           icon="github"
           label="GITHUB REPOSITORY"
           value="MdSagorMunshi/Ledger"
           url={APP_INFO.sourceUrl}
+          C={C}
         />
       </View>
 
-      <SectionHeader title="DEVELOPER" />
+      <SectionHeader title="DEVELOPER" C={C} />
       <View style={s.section}>
-        <DataRow label="NAME" value={DEVELOPER.name} />
+        <DataRow label="NAME" value={DEVELOPER.name} C={C} />
         <View style={s.divider} />
         <LinkRow
           icon="mail"
           label="EMAIL"
           value={DEVELOPER.email}
           url={`mailto:${DEVELOPER.email}`}
+          C={C}
         />
         <View style={s.divider} />
         <LinkRow
@@ -170,6 +198,7 @@ export default function AboutScreen() {
           label="GITHUB"
           value={`@${DEVELOPER.github}`}
           url={`https://github.com/${DEVELOPER.github}`}
+          C={C}
         />
         <View style={s.divider} />
         <LinkRow
@@ -177,6 +206,7 @@ export default function AboutScreen() {
           label="TELEGRAM"
           value={`@${DEVELOPER.telegram}`}
           url={`https://t.me/${DEVELOPER.telegram}`}
+          C={C}
         />
         <View style={s.divider} />
         <LinkRow
@@ -184,20 +214,21 @@ export default function AboutScreen() {
           label="REDDIT"
           value={`u/${DEVELOPER.reddit}`}
           url={`https://reddit.com/u/${DEVELOPER.reddit}`}
+          C={C}
         />
       </View>
 
-      <SectionHeader title="TECH STACK" />
+      <SectionHeader title="TECH STACK" C={C} />
       <View style={s.section}>
         {TECH_STACK.map((item, idx) => (
           <React.Fragment key={item.label}>
-            <DataRow label={item.label} value={item.value} />
+            <DataRow label={item.label} value={item.value} C={C} />
             {idx < TECH_STACK.length - 1 && <View style={s.divider} />}
           </React.Fragment>
         ))}
       </View>
 
-      <SectionHeader title="CHANGELOG" />
+      <SectionHeader title="CHANGELOG" C={C} />
       <View style={s.changelogList}>
         {CHANGELOGS.map((release) => (
           <View key={release.version} style={s.changelogCard}>
@@ -223,7 +254,7 @@ export default function AboutScreen() {
         ))}
       </View>
 
-      <SectionHeader title="PRIVACY" />
+      <SectionHeader title="PRIVACY" C={C} />
       <View style={s.section}>
         <View style={s.privacyBlock}>
           <Text style={s.privacyLine}>{"// NO DATA LEAVES YOUR DEVICE"}</Text>
@@ -247,7 +278,7 @@ export default function AboutScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const getStyles = (C: ReturnType<typeof getThemeColors>) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: C.forgeBlack,

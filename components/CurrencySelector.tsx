@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import colors from "@/constants/colors";
+import { getThemeColors } from "@/constants/colors";
 import { CURRENCIES, Currency, useLedger } from "@/context/LedgerContext";
 
 interface CurrencySelectorProps {
@@ -17,7 +17,8 @@ interface CurrencySelectorProps {
 }
 
 export function CurrencySelector({ visible, onClose }: CurrencySelectorProps) {
-  const { currency, setCurrency } = useLedger();
+  const { currency, setCurrency, appSettings } = useLedger();
+  const C = getThemeColors(appSettings.theme);
 
   const handleSelect = (c: Currency) => {
     setCurrency(c);
@@ -34,11 +35,11 @@ export function CurrencySelector({ visible, onClose }: CurrencySelectorProps) {
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modal}>
+            <View style={[styles.modal, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
               <View style={styles.header}>
-                <Text style={styles.title}>CURRENCY</Text>
+                <Text style={[styles.title, { color: C.cipherWhite }]}>CURRENCY</Text>
                 <TouchableOpacity onPress={onClose}>
-                  <Feather name="x" size={18} color={colors.light.slateText} />
+                  <Feather name="x" size={18} color={C.slateText} />
                 </TouchableOpacity>
               </View>
               {CURRENCIES.map((c) => (
@@ -46,17 +47,20 @@ export function CurrencySelector({ visible, onClose }: CurrencySelectorProps) {
                   key={c.code}
                   style={[
                     styles.item,
-                    c.code === currency.code && styles.itemActive,
+                    c.code === currency.code && {
+                      borderColor: C.amberSignal,
+                      backgroundColor: `${C.amberSignal}14`,
+                    },
                   ]}
                   onPress={() => handleSelect(c)}
                 >
-                  <Text style={styles.symbol}>{c.symbol}</Text>
-                  <Text style={styles.code}>{c.code}</Text>
+                  <Text style={[styles.symbol, { color: C.amberSignal }]}>{c.symbol}</Text>
+                  <Text style={[styles.code, { color: C.cipherWhite }]}>{c.code}</Text>
                   {c.code === currency.code && (
                     <Feather
                       name="check"
                       size={14}
-                      color={colors.light.amberSignal}
+                      color={C.amberSignal}
                       style={{ marginLeft: "auto" }}
                     />
                   )}
@@ -79,9 +83,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modal: {
-    backgroundColor: colors.light.vaultDark,
     borderWidth: 1,
-    borderColor: colors.light.wireGray,
     borderRadius: 8,
     padding: 20,
     width: "100%",
@@ -97,7 +99,6 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 12,
-    color: colors.light.cipherWhite,
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
@@ -111,20 +112,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent",
   },
-  itemActive: {
-    borderColor: colors.light.amberSignal,
-    backgroundColor: "rgba(245,158,11,0.08)",
-  },
   symbol: {
     fontFamily: "JetBrainsMono_600SemiBold",
     fontSize: 16,
-    color: colors.light.amberSignal,
     width: 24,
     textAlign: "center",
   },
   code: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 13,
-    color: colors.light.cipherWhite,
   },
 });
