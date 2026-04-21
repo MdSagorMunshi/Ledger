@@ -8,6 +8,8 @@
 
 LEDGER is a private, local-first personal finance application built with Expo and React Native. It is designed for users who want fast expense tracking, clear financial visibility, and strong on-device control without relying on a backend, cloud account, or telemetry stack.
 
+Website: [getledger.pages.dev](https://getledger.pages.dev)
+
 ## Why LEDGER
 
 LEDGER is built around a simple operating model:
