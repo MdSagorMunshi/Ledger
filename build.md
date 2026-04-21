@@ -59,7 +59,7 @@ The project defines these profiles in `eas.json`:
 - `debug`
   Internal Android debug APK
 - `release`
-  Internal Android release APK
+  Internal Android release APKs with ABI splits and a universal APK
 - `production`
   Android App Bundle (`.aab`) for production delivery
 
@@ -72,6 +72,29 @@ eas build --platform android --profile development
 eas build --platform android --profile debug
 eas build --platform android --profile release
 eas build --platform android --profile production
+```
+
+## Local Android Release APK Outputs
+
+Run the release build from the native Android project:
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+With ABI splits enabled, the release output directory will contain APKs for:
+
+- `armeabi-v7a`
+- `arm64-v8a`
+- `x86`
+- `x86_64`
+- `universal`
+
+Expected output directory:
+
+```bash
+android/app/build/outputs/apk/release/
 ```
 
 For iOS, add an iOS profile to `eas.json` if you want remote iOS builds.
@@ -88,3 +111,22 @@ Current native identifiers from `app.json`:
 - The app uses Expo Router as the main entry point.
 - Native biometric support is configured through `expo-local-authentication`.
 - If native configuration changes are made, rebuild the app binary before testing those changes.
+
+## Android Release Signing
+
+The Android release build now expects `android/key.properties` with:
+
+```properties
+storeFile=keystores/ledger-release.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+The keystore file should exist at:
+
+```bash
+android/keystores/ledger-release.jks
+```
+
+If `android/key.properties` is incomplete, release builds will fail with a clear signing error instead of falling back to the debug keystore.
