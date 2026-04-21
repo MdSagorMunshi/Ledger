@@ -16,6 +16,7 @@ Thumbs.db
 
 # Build output
 *.tsbuildinfo
+release/
 
 # Logs
 npm-debug.log
