@@ -13,10 +13,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLedger } from "@/context/LedgerContext";
 import { performAutoBackup } from "@/utils/autoBackup";
 import colors, { getThemeColors } from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 function AppHeader() {
   const insets = useSafeAreaInsets();
   const { lock, appSettings } = useLedger();
+  const { t } = useI18n();
   const C = getThemeColors(appSettings.theme);
 
   const handleLock = () => {
@@ -43,7 +45,7 @@ function AppHeader() {
           <Text style={[styles.brandText, { color: C.amberSignal }]}>LEDGER</Text>
         </View>
         <Text style={[styles.offlineTag, { color: C.ghostText }]}>
-          {"// LOCAL ONLY · NO SYNC"}
+          {t("shell.local_only_no_sync")}
         </Text>
       </View>
       <TouchableOpacity
@@ -51,24 +53,25 @@ function AppHeader() {
         onPress={handleLock}
       >
         <Feather name="log-out" size={11} color={C.amberSignal} />
-        <Text style={[styles.lockBtnText, { color: C.amberSignal }]}>LOCK</Text>
+        <Text style={[styles.lockBtnText, { color: C.amberSignal }]}>{t("shell.lock")}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const TABS = [
-  { name: "dashboard", label: "DASH", icon: "grid" as const },
-  { name: "add", label: "ADD", icon: "plus-circle" as const },
-  { name: "history", label: "HISTORY", icon: "list" as const },
-  { name: "finances", label: "FINANCE", icon: "trending-up" as const },
-  { name: "analytics", label: "ANALYTICS", icon: "bar-chart-2" as const },
-  { name: "settings", label: "SETTINGS", icon: "settings" as const },
+  { name: "dashboard", labelKey: "tab.dashboard", icon: "grid" as const },
+  { name: "add", labelKey: "tab.add", icon: "plus-circle" as const },
+  { name: "history", labelKey: "tab.history", icon: "list" as const },
+  { name: "finances", labelKey: "tab.finance", icon: "trending-up" as const },
+  { name: "analytics", labelKey: "tab.analytics", icon: "bar-chart-2" as const },
+  { name: "settings", labelKey: "tab.settings", icon: "settings" as const },
 ];
 
 function TabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { appSettings } = useLedger();
+  const { t } = useI18n();
   const C = getThemeColors(appSettings.theme);
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -115,7 +118,7 @@ function TabBar({ state, descriptors, navigation }: any) {
                 { color: isFocused ? C.amberSignal : C.ghostText },
               ]}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </Text>
           </TouchableOpacity>
         );
@@ -149,6 +152,7 @@ export default function AppLayout() {
   const backupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const C = getThemeColors(appSettings.theme);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!isUnlocked) {
@@ -240,13 +244,13 @@ export default function AppLayout() {
         tabBar={(props) => <TabBar {...props} />}
         screenOptions={{ headerShown: false }}
       >
-        <Tabs.Screen name="dashboard" options={{ title: "Dashboard" }} />
-        <Tabs.Screen name="add" options={{ title: "Add" }} />
-        <Tabs.Screen name="history" options={{ title: "History" }} />
-        <Tabs.Screen name="finances" options={{ title: "Finances" }} />
-        <Tabs.Screen name="analytics" options={{ title: "Analytics" }} />
-        <Tabs.Screen name="settings" options={{ title: "Settings" }} />
-        <Tabs.Screen name="about" options={{ title: "About", href: null }} />
+        <Tabs.Screen name="dashboard" options={{ title: t("screen.dashboard") }} />
+        <Tabs.Screen name="add" options={{ title: t("screen.add") }} />
+        <Tabs.Screen name="history" options={{ title: t("screen.history") }} />
+        <Tabs.Screen name="finances" options={{ title: t("screen.finances") }} />
+        <Tabs.Screen name="analytics" options={{ title: t("screen.analytics") }} />
+        <Tabs.Screen name="settings" options={{ title: t("screen.settings") }} />
+        <Tabs.Screen name="about" options={{ title: t("screen.about"), href: null }} />
       </Tabs>
     </View>
   );

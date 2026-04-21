@@ -47,6 +47,16 @@ export type Currency = {
   symbol: string;
 };
 
+export type AppLanguage =
+  | "en"
+  | "bn"
+  | "hi"
+  | "es"
+  | "ja"
+  | "fr"
+  | "de"
+  | "ar";
+
 export const CURRENCIES: Currency[] = [
   { code: "BDT", symbol: "৳" },
   { code: "USD", symbol: "$" },
@@ -156,6 +166,7 @@ export interface AppSettings {
   autoLockMinutes: number | null;
   theme: "dark" | "dim" | "oled";
   defaultCurrencyCode: string;
+  language: AppLanguage;
 }
 
 function generateId(): string {
@@ -263,8 +274,18 @@ interface LedgerContextValue extends LedgerState {
   updateAssetEntry: (id: string, updates: Partial<AssetEntry>) => void;
   deleteAssetEntry: (id: string) => void;
   addOweEntry: (o: Omit<OweEntry, "id">) => void;
+  updateOweEntry: (
+    id: string,
+    updates: Partial<Omit<OweEntry, "id" | "repayments">>
+  ) => void;
+  deleteOweEntry: (id: string) => void;
   repayOweEntry: (oweId: string, repayment: Omit<OweRepayment, "id">) => void;
   addLendEntry: (l: Omit<LendEntry, "id">) => void;
+  updateLendEntry: (
+    id: string,
+    updates: Partial<Omit<LendEntry, "id" | "repayments">>
+  ) => void;
+  deleteLendEntry: (id: string) => void;
   repayLendEntry: (lendId: string, repayment: Omit<LendRepayment, "id">) => void;
   toggleLendNetWorth: (lendId: string) => void;
   addBudgetEnvelope: (b: Omit<BudgetEnvelope, "id">) => void;
@@ -286,6 +307,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoLockMinutes: null,
   theme: "dark",
   defaultCurrencyCode: "BDT",
+  language: "en",
 };
 
 export function LedgerProvider({ children }: { children: React.ReactNode }) {
@@ -462,7 +484,9 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
             if (stored.lendEntries) setLendEntries(stored.lendEntries);
             if (stored.budgetEnvelopes) setBudgetEnvelopes(stored.budgetEnvelopes);
             if (stored.recurringTemplates) setRecurringTemplates(stored.recurringTemplates);
-            if (stored.appSettings) setAppSettings(stored.appSettings);
+            if (stored.appSettings) {
+              setAppSettings({ ...DEFAULT_SETTINGS, ...stored.appSettings });
+            }
             if (stored.currency) setCurrencyState(stored.currency);
             if (stored.biometricEnabled !== undefined) setBiometricEnabledState(stored.biometricEnabled);
             if (stored.autoBackupEnabled !== undefined) setAutoBackupEnabledState(stored.autoBackupEnabled);
@@ -607,6 +631,56 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     setOweEntries((prev) => [{ ...o, id }, ...prev]);
   }, []);
 
+  const updateOweEntry = useCallback(
+    (
+      id: string,
+      updates: Partial<Omit<OweEntry, "id" | "repayments">>
+    ) => {
+      setOweEntries((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== id) return entry;
+          const nextOriginalAmount =
+            updates.originalAmount ?? entry.originalAmount;
+          const nextRemainingAmount =
+            updates.remainingAmount ?? entry.remainingAmount;
+          const nextStatus =
+            updates.status ??
+            (nextRemainingAmount <= 0
+              ? "settled"
+              : nextRemainingAmount < nextOriginalAmount
+              ? "partial"
+              : "unpaid");
+
+          return {
+            ...entry,
+            ...updates,
+            originalAmount: nextOriginalAmount,
+            remainingAmount: nextRemainingAmount,
+            status: nextStatus,
+          };
+        })
+      );
+    },
+    []
+  );
+
+  const deleteOweEntry = useCallback((id: string) => {
+    setOweEntries((prev) => {
+      const target = prev.find((entry) => entry.id === id);
+      if (target) {
+        const repaymentTxIds = new Set(
+          target.repayments.map((repayment) => repayment.ledgerTxId)
+        );
+        if (repaymentTxIds.size > 0) {
+          setTransactions((current) =>
+            current.filter((tx) => !repaymentTxIds.has(tx.id))
+          );
+        }
+      }
+      return prev.filter((entry) => entry.id !== id);
+    });
+  }, []);
+
   const repayOweEntry = useCallback(
     (oweId: string, repayment: Omit<OweRepayment, "id">) => {
       const repId = generateId();
@@ -631,6 +705,56 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   const addLendEntry = useCallback((l: Omit<LendEntry, "id">) => {
     const id = generateId();
     setLendEntries((prev) => [{ ...l, id }, ...prev]);
+  }, []);
+
+  const updateLendEntry = useCallback(
+    (
+      id: string,
+      updates: Partial<Omit<LendEntry, "id" | "repayments">>
+    ) => {
+      setLendEntries((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== id) return entry;
+          const nextOriginalAmount =
+            updates.originalAmount ?? entry.originalAmount;
+          const nextRemainingAmount =
+            updates.remainingAmount ?? entry.remainingAmount;
+          const nextStatus =
+            updates.status ??
+            (nextRemainingAmount <= 0
+              ? "returned"
+              : nextRemainingAmount < nextOriginalAmount
+              ? "partial"
+              : "outstanding");
+
+          return {
+            ...entry,
+            ...updates,
+            originalAmount: nextOriginalAmount,
+            remainingAmount: nextRemainingAmount,
+            status: nextStatus,
+          };
+        })
+      );
+    },
+    []
+  );
+
+  const deleteLendEntry = useCallback((id: string) => {
+    setLendEntries((prev) => {
+      const target = prev.find((entry) => entry.id === id);
+      if (target) {
+        const repaymentTxIds = new Set(
+          target.repayments.map((repayment) => repayment.ledgerTxId)
+        );
+        if (repaymentTxIds.size > 0) {
+          setTransactions((current) =>
+            current.filter((tx) => !repaymentTxIds.has(tx.id))
+          );
+        }
+      }
+      return prev.filter((entry) => entry.id !== id);
+    });
   }, []);
 
   const repayLendEntry = useCallback(
@@ -699,7 +823,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     if (state.lendEntries) setLendEntries(state.lendEntries);
     if (state.budgetEnvelopes) setBudgetEnvelopes(state.budgetEnvelopes);
     if (state.recurringTemplates) setRecurringTemplates(state.recurringTemplates);
-    if (state.appSettings) setAppSettings(state.appSettings);
+    if (state.appSettings) setAppSettings({ ...DEFAULT_SETTINGS, ...state.appSettings });
     if (state.currency) setCurrencyState(state.currency);
   }, []);
 
@@ -750,8 +874,12 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       updateAssetEntry,
       deleteAssetEntry,
       addOweEntry,
+      updateOweEntry,
+      deleteOweEntry,
       repayOweEntry,
       addLendEntry,
+      updateLendEntry,
+      deleteLendEntry,
       repayLendEntry,
       toggleLendNetWorth,
       addBudgetEnvelope,
@@ -808,8 +936,12 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       updateAssetEntry,
       deleteAssetEntry,
       addOweEntry,
+      updateOweEntry,
+      deleteOweEntry,
       repayOweEntry,
       addLendEntry,
+      updateLendEntry,
+      deleteLendEntry,
       repayLendEntry,
       toggleLendNetWorth,
       addBudgetEnvelope,

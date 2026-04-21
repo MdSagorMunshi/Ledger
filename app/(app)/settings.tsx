@@ -27,13 +27,9 @@ import { ExportModal } from "@/components/ExportModal";
 import { useImport } from "@/components/ImportFlow";
 import { ReportCard } from "@/components/ReportCard";
 import { CurrencySelector } from "@/components/CurrencySelector";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { pickBackupFolder, defaultBackupPath, performAutoBackup } from "@/utils/autoBackup";
-
-const FREQ_LABELS: Record<string, string> = {
-  daily: "Daily",
-  weekly: "Weekly",
-  monthly: "Monthly",
-};
+import { getLanguageLabel, useI18n } from "@/utils/i18n";
 
 function SectionHeader({ label }: { label: string }) {
   return <Text style={styles.sectionHeader}>{label}</Text>;
@@ -90,6 +86,7 @@ function ChangePinModal({
   onChanged: (newPin: string) => void;
   C: ReturnType<typeof getThemeColors>;
 }) {
+  const { t } = useI18n();
   const [step, setStep] = useState<"current" | "new" | "confirm">("current");
   const [input, setInput] = useState("");
   const [newPin, setNewPin] = useState("");
@@ -125,7 +122,7 @@ function ChangePinModal({
   const advance = (val: string) => {
     if (step === "current") {
       if (val !== currentPin) {
-        setError("Incorrect PIN");
+        setError(t("settings.incorrect_pin"));
         setInput("");
         return;
       }
@@ -137,7 +134,7 @@ function ChangePinModal({
       setInput("");
     } else {
       if (val !== newPin) {
-        setError("PINs don't match");
+        setError(t("settings.pins_do_not_match"));
         setStep("new");
         setNewPin("");
         setInput("");
@@ -150,9 +147,9 @@ function ChangePinModal({
   };
 
   const labels: Record<string, string> = {
-    current: "ENTER CURRENT PIN",
-    new: "ENTER NEW PIN",
-    confirm: "CONFIRM NEW PIN",
+    current: t("settings.change_pin_current"),
+    new: t("settings.change_pin_new"),
+    confirm: t("settings.change_pin_confirm"),
   };
 
   return (
@@ -223,6 +220,7 @@ function BackupPasswordModal({
   onClose: () => void;
   C: ReturnType<typeof getThemeColors>;
 }) {
+  const { t } = useI18n();
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -234,8 +232,8 @@ function BackupPasswordModal({
       onClose();
       return;
     }
-    if (pw.length < 4) { setError("Min 4 characters"); return; }
-    if (pw !== confirm) { setError("Passwords don't match"); return; }
+    if (pw.length < 4) { setError(t("settings.min_chars", { count: 4 })); return; }
+    if (pw !== confirm) { setError(t("settings.pins_do_not_match")); return; }
     onSave(pw);
     onClose();
   };
@@ -244,7 +242,7 @@ function BackupPasswordModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.modalBox, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-          <Text style={[styles.modalTitle, { color: C.cipherWhite }]}>BACKUP PASSWORD</Text>
+          <Text style={[styles.modalTitle, { color: C.cipherWhite }]}>{t("settings.backup_password_title")}</Text>
           <TouchableOpacity
             style={[styles.checkRow]}
             onPress={() => { setUseDefault((p) => !p); setPw(""); setConfirm(""); setError(""); }}
@@ -261,7 +259,7 @@ function BackupPasswordModal({
               {useDefault && <Feather name="check" size={10} color={C.amberSignal} />}
             </View>
             <Text style={[styles.checkLabel, { color: C.cipherWhite }]}>
-              Use screen lock PIN
+              {t("settings.use_screen_lock_pin")}
             </Text>
           </TouchableOpacity>
           {!useDefault && (
@@ -269,16 +267,16 @@ function BackupPasswordModal({
               <TextInput
                 style={[styles.formInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
                 value={pw}
-                onChangeText={(t) => { setPw(t); setError(""); }}
-                placeholder="Custom password"
+                onChangeText={(value) => { setPw(value); setError(""); }}
+                placeholder={t("settings.custom_password_placeholder")}
                 placeholderTextColor={C.ghostText}
                 secureTextEntry
               />
               <TextInput
                 style={[styles.formInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
                 value={confirm}
-                onChangeText={(t) => { setConfirm(t); setError(""); }}
-                placeholder="Confirm password"
+                onChangeText={(value) => { setConfirm(value); setError(""); }}
+                placeholder={t("settings.confirm_password_placeholder")}
                 placeholderTextColor={C.ghostText}
                 secureTextEntry
               />
@@ -287,13 +285,13 @@ function BackupPasswordModal({
           )}
           <View style={[styles.formBtns, { marginTop: 12 }]}>
             <TouchableOpacity style={[styles.formBtn, { borderColor: C.wireGray }]} onPress={onClose}>
-              <Text style={[styles.formBtnText, { color: C.slateText }]}>CANCEL</Text>
+              <Text style={[styles.formBtnText, { color: C.slateText }]}>{t("common.cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.formBtn, { flex: 1, borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}18` }]}
               onPress={handleSave}
             >
-              <Text style={[styles.formBtnText, { color: C.amberSignal }]}>SAVE</Text>
+              <Text style={[styles.formBtnText, { color: C.amberSignal }]}>{t("common.save")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -314,6 +312,7 @@ function WipeModal({
   onClose: () => void;
   C: ReturnType<typeof getThemeColors>;
 }) {
+  const { t } = useI18n();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -321,25 +320,25 @@ function WipeModal({
           <View style={[styles.modalIconRow, { backgroundColor: `${C.debitRed}18` }]}>
             <Feather name="trash-2" size={24} color={C.debitRed} />
           </View>
-          <Text style={[styles.modalTitle, { color: C.debitRed }]}>WIPE ALL DATA</Text>
+          <Text style={[styles.modalTitle, { color: C.debitRed }]}>{t("settings.wipe_title")}</Text>
           <Text style={[styles.modalBody, { color: C.cipherWhite }]}>
-            This will permanently delete all stored ledger data on this device.
+            {t("settings.wipe_body")}
           </Text>
           <Text style={[styles.modalBodySub, { color: C.slateText }]}>
-            This action cannot be undone. Your local database will be empty.
+            {t("settings.wipe_body_sub")}
           </Text>
           <View style={[styles.formBtns, { marginTop: 12 }]}>
             <TouchableOpacity
               style={[styles.formBtn, { flex: 1, borderColor: C.wireGray }]}
               onPress={onClose}
             >
-              <Text style={[styles.formBtnText, { color: C.slateText }]}>CANCEL</Text>
+              <Text style={[styles.formBtnText, { color: C.slateText }]}>{t("common.cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.formBtn, { flex: 1, borderColor: C.debitRed, backgroundColor: `${C.debitRed}18` }]}
               onPress={onConfirm}
             >
-              <Text style={[styles.formBtnText, { color: C.debitRed }]}>WIPE</Text>
+              <Text style={[styles.formBtnText, { color: C.debitRed }]}>{t("common.wipe")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -466,10 +465,12 @@ export default function SettingsScreen() {
   } = useLedger();
 
   const C = getThemeColors(appSettings.theme);
+  const { t, tf, tc } = useI18n();
 
   const [showExport, setShowExport] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showCurrency, setShowCurrency] = useState(false);
+  const [showLanguage, setShowLanguage] = useState(false);
   const [showChangePin, setShowChangePin] = useState(false);
   const [showBackupPassword, setShowBackupPassword] = useState(false);
   const [showBackupFolderModal, setShowBackupFolderModal] = useState(false);
@@ -497,7 +498,7 @@ export default function SettingsScreen() {
     onImported: (txs, count, fullState) => {
       if (fullState) loadFullState(fullState);
       else loadFullState({ transactions: txs });
-      showBanner(`IMPORTED ${count} ENTRIES`);
+      showBanner(t("settings.imported_entries", { count }));
     },
   });
 
@@ -531,7 +532,7 @@ export default function SettingsScreen() {
       recordBackupResult(result.time, result.path);
       return true;
     }
-    Alert.alert("Backup Error", result.reason || "Failed to create backup.");
+    Alert.alert(t("settings.backup_error"), result.reason || t("settings.backup_failed"));
     return false;
   };
 
@@ -591,7 +592,7 @@ export default function SettingsScreen() {
       return;
     }
     if (Platform.OS === "web") {
-      Alert.alert("Not supported", "Biometric unlock requires a native device.");
+      Alert.alert(t("settings.not_supported"), t("settings.native_required"));
       return;
     }
     try {
@@ -600,46 +601,46 @@ export default function SettingsScreen() {
       const isEnrolled = await LocalAuth.isEnrolledAsync();
       if (!hasHardware || !isEnrolled) {
         Alert.alert(
-          "Biometrics unavailable",
-          "Your device doesn't have biometrics enrolled. Enable fingerprint or Face ID in your device settings first."
+          t("settings.biometrics_unavailable"),
+          t("settings.biometrics_unavailable_desc")
         );
         return;
       }
       const result = await LocalAuth.authenticateAsync({
-        promptMessage: "Confirm to enable biometric unlock",
-        cancelLabel: "Cancel",
+        promptMessage: t("settings.confirm_enable_biometrics"),
+        cancelLabel: t("common.cancel"),
         disableDeviceFallback: true,
       });
       if (result.success) {
         setBiometricEnabled(true);
       }
     } catch {
-      Alert.alert("Error", "Could not access biometrics. Please try again.");
+      Alert.alert(t("settings.error"), t("settings.biometrics_error"));
     }
   };
 
   const handleWipe = () => {
     wipeData();
     setShowWipe(false);
-    showBanner("ALL DATA WIPED");
+    showBanner(t("settings.all_data_wiped"));
   };
 
   const lockOptions: { label: string; value: number | null }[] = [
-    { label: "Never", value: null },
-    { label: "1 min", value: 1 },
-    { label: "5 min", value: 5 },
-    { label: "15 min", value: 15 },
+    { label: t("settings.never"), value: null },
+    { label: t("settings.min_1"), value: 1 },
+    { label: t("settings.min_5"), value: 5 },
+    { label: t("settings.min_15"), value: 15 },
   ];
 
   const themeOptions: { label: string; value: "dark" | "dim" | "oled" }[] = [
-    { label: "Dark", value: "dark" },
-    { label: "Dim", value: "dim" },
-    { label: "OLED", value: "oled" },
+    { label: t("settings.dark"), value: "dark" },
+    { label: t("settings.dim"), value: "dim" },
+    { label: t("settings.oled"), value: "oled" },
   ];
 
   const lastBackupLabel = lastBackupTime
     ? new Date(lastBackupTime).toLocaleString()
-    : "No backups yet";
+    : t("settings.no_backups_yet");
   const backupFolderLabel = Platform.OS === "web"
     ? "N/A — not supported on web"
     : Platform.OS === "android"
@@ -662,7 +663,7 @@ export default function SettingsScreen() {
 
       {/* ── DATA ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="DATA" />
+        <SectionHeader label={t("settings.data")} />
 
         {/* Session entries count */}
         <View style={[styles.row, { borderTopColor: C.wireGray }]}>
@@ -670,9 +671,12 @@ export default function SettingsScreen() {
             <Feather name="database" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>STORED ENTRIES</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.stored_entries")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {transactions.length} transaction{transactions.length !== 1 ? "s" : ""} saved locally
+              {t("settings.saved_locally", {
+                count: transactions.length,
+                suffix: transactions.length !== 1 ? "s" : "",
+              })}
             </Text>
           </View>
         </View>
@@ -686,8 +690,8 @@ export default function SettingsScreen() {
             <Feather name="file-text" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>MONTHLY REPORT</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Print-ready monthly summary</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.monthly_report")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.print_ready_summary")}</Text>
           </View>
           <Feather name="chevron-right" size={14} color={C.ghostText} />
         </TouchableOpacity>
@@ -701,8 +705,8 @@ export default function SettingsScreen() {
             <Feather name="upload" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>EXPORT LEDGER</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Save a plain or PIN-encrypted snapshot</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.export_ledger")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.export_desc")}</Text>
           </View>
           <Feather name="chevron-right" size={14} color={C.ghostText} />
         </TouchableOpacity>
@@ -716,8 +720,8 @@ export default function SettingsScreen() {
             <Feather name="download" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>IMPORT LEDGER</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Load from a previously exported file</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.import_ledger")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.import_desc")}</Text>
           </View>
           <Feather name="chevron-right" size={14} color={C.ghostText} />
         </TouchableOpacity>
@@ -731,8 +735,8 @@ export default function SettingsScreen() {
             <Feather name="trash-2" size={14} color={C.debitRed} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.debitRed }]}>WIPE ALL DATA</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Delete all stored data permanently</Text>
+            <Text style={[styles.rowLabel, { color: C.debitRed }]}>{t("settings.wipe_all_data")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.wipe_desc")}</Text>
           </View>
           <Feather name="chevron-right" size={14} color={C.debitRed} />
         </TouchableOpacity>
@@ -740,16 +744,16 @@ export default function SettingsScreen() {
 
       {/* ── AUTO BACKUP ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="AUTO BACKUP" />
+        <SectionHeader label={t("settings.auto_backup")} />
 
         <View style={[styles.row, { borderTopColor: C.wireGray }]}>
           <View style={[styles.iconBox, { backgroundColor: `${C.amberSignal}18` }]}>
             <Feather name="hard-drive" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>AUTO BACKUP</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.auto_backup")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {Platform.OS === "web" ? "Requires native device (Android/iOS)" : "Saves on every change"}
+              {Platform.OS === "web" ? t("settings.requires_native") : t("settings.saves_every_change")}
             </Text>
           </View>
           <Switch
@@ -771,7 +775,7 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.rowLabel, { color: Platform.OS === "android" ? C.cipherWhite : C.ghostText }]}>
-              BACKUP FOLDER
+              {t("settings.backup_folder")}
             </Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
               {backupFolderLabel}
@@ -796,10 +800,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.rowLabel, { color: Platform.OS === "web" ? C.ghostText : C.cipherWhite }]}>
-              BACKUP PASSWORD
+              {t("settings.backup_password")}
             </Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {autoBackupPassword ? "Custom password set" : "Using screen lock PIN"}
+              {autoBackupPassword ? t("settings.custom_password") : t("settings.using_pin")}
             </Text>
           </View>
           <View
@@ -815,7 +819,7 @@ export default function SettingsScreen() {
             <Feather name="clock" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>LAST BACKUP</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.last_backup")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
               {Platform.OS === "web" ? "N/A — not supported on web" : lastBackupLabel}
             </Text>
@@ -825,16 +829,16 @@ export default function SettingsScreen() {
 
       {/* ── SECURITY ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="SECURITY" />
+        <SectionHeader label={t("settings.security")} />
 
         <View style={[styles.row, { borderTopColor: C.wireGray }]}>
           <View style={[styles.iconBox, { backgroundColor: `${C.creditGreen}18` }]}>
             <Feather name="database" size={14} color={C.creditGreen} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>LOCAL STORAGE</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.local_storage")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              Data stays on this device. Exports and backups can be encrypted.
+              {t("settings.local_storage_desc")}
             </Text>
           </View>
           <View
@@ -854,8 +858,8 @@ export default function SettingsScreen() {
             <Feather name="key" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>CHANGE PIN</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Update your 4-digit app PIN</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.change_pin")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.change_pin_desc")}</Text>
           </View>
           <Feather name="chevron-right" size={14} color={C.ghostText} />
         </TouchableOpacity>
@@ -866,9 +870,9 @@ export default function SettingsScreen() {
             <Feather name="user-check" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>BIOMETRIC UNLOCK</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.biometric_unlock")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {biometricEnabled ? "Fingerprint / Face ID active" : "Use PIN only"}
+              {biometricEnabled ? t("settings.biometric_on") : t("settings.biometric_off")}
             </Text>
           </View>
           <Switch
@@ -885,8 +889,8 @@ export default function SettingsScreen() {
             <Feather name="clock" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>AUTO-LOCK</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Lock the app after idle time</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.auto_lock")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.auto_lock_desc")}</Text>
           </View>
         </View>
         <View style={[styles.lockChips, { paddingHorizontal: 16, paddingBottom: 14 }]}>
@@ -915,19 +919,19 @@ export default function SettingsScreen() {
 
       {/* ── APPEARANCE ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="APPEARANCE" />
+        <SectionHeader label={t("settings.appearance")} />
         <View style={[styles.row, { borderTopColor: C.wireGray }]}>
           <View style={[styles.iconBox, { backgroundColor: `${C.amberSignal}18` }]}>
             <Feather name="moon" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>THEME</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.theme")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
               {appSettings.theme === "dark"
-                ? "Deep black background"
+                ? t("settings.theme_dark_desc")
                 : appSettings.theme === "dim"
-                ? "Softer slate tones"
-                : "Pure black OLED surfaces"}
+                ? t("settings.theme_dim_desc")
+                : t("settings.theme_oled_desc")}
             </Text>
           </View>
           <PillGroup
@@ -939,9 +943,28 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        <SectionHeader label={t("settings.language")} />
+        <TouchableOpacity
+          style={[styles.row, { borderTopColor: C.wireGray }]}
+          onPress={() => setShowLanguage(true)}
+        >
+          <View style={[styles.iconBox, { backgroundColor: `${C.amberSignal}18` }]}>
+            <Feather name="globe" size={14} color={C.amberSignal} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.language")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.language_desc")}</Text>
+          </View>
+          <View style={[styles.currencyBadge, { backgroundColor: C.wireDim, borderColor: C.wireGray, width: "auto", paddingHorizontal: 10 }]}>
+            <Text style={[styles.pillText, { color: C.amberSignal }]}>{getLanguageLabel(appSettings.language)}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
       {/* ── CURRENCY ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="CURRENCY" />
+        <SectionHeader label={t("settings.currency")} />
         <TouchableOpacity
           style={[styles.row, { borderTopColor: C.wireGray }]}
           onPress={() => setShowCurrency(true)}
@@ -950,7 +973,7 @@ export default function SettingsScreen() {
             <Feather name="dollar-sign" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>ACTIVE CURRENCY</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.active_currency")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>{currency.code}</Text>
           </View>
           <View style={[styles.currencyBadge, { backgroundColor: C.wireDim, borderColor: C.wireGray }]}>
@@ -961,7 +984,7 @@ export default function SettingsScreen() {
 
       {/* ── BUDGET ENVELOPES ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="BUDGET ENVELOPES" />
+        <SectionHeader label={t("settings.budget_envelopes")} />
         {(budgetEnvelopes as BudgetEnvelope[]).map((env) => {
           const spent = computeBudgetProgress(transactions, env.category);
           const pct = env.monthlyLimit > 0 ? Math.min(1, spent / env.monthlyLimit) : 0;
@@ -973,7 +996,7 @@ export default function SettingsScreen() {
               </View>
               <View style={{ flex: 1, gap: 5 }}>
                 <View style={styles.envelopeTop}>
-                  <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{env.category}</Text>
+                  <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{tc(env.category)}</Text>
                   <Text style={[styles.envelopePct, { color: barColor }]}>{Math.round(pct * 100)}%</Text>
                 </View>
                 <View style={[styles.envelopeBar, { backgroundColor: C.wireGray }]}>
@@ -995,7 +1018,7 @@ export default function SettingsScreen() {
         })}
         {showAddEnvelope ? (
           <View style={[styles.addForm, { borderTopColor: C.wireGray }]}>
-            <Text style={[styles.formLabel, { color: C.ghostText }]}>CATEGORY</Text>
+            <Text style={[styles.formLabel, { color: C.ghostText }]}>{t("add.category")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
               <View style={{ flexDirection: "row", gap: 6 }}>
                 {EXPENSE_CATEGORIES.map((cat) => (
@@ -1011,48 +1034,48 @@ export default function SettingsScreen() {
                     onPress={() => setEnvCategory(cat)}
                   >
                     <Text style={[styles.pillText, { color: envCategory === cat ? C.amberSignal : C.slateText }]}>
-                      {cat}
+                      {tc(cat)}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
-            <Text style={[styles.formLabel, { color: C.ghostText }]}>MONTHLY LIMIT</Text>
+            <Text style={[styles.formLabel, { color: C.ghostText }]}>{t("settings.monthly_limit")}</Text>
             <TextInput
               style={[styles.formInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
               value={envLimit}
               onChangeText={setEnvLimit}
-              placeholder="0.00"
+              placeholder={t("finances.amount_placeholder")}
               placeholderTextColor={C.ghostText}
               keyboardType="decimal-pad"
             />
             <View style={styles.formBtns}>
               <TouchableOpacity style={[styles.formBtn, { borderColor: C.wireGray }]} onPress={() => setShowAddEnvelope(false)}>
-                <Text style={[styles.formBtnText, { color: C.slateText }]}>CANCEL</Text>
+                <Text style={[styles.formBtnText, { color: C.slateText }]}>{t("analytics.close")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.formBtn, { flex: 1, borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}18` }]}
                 onPress={handleAddEnvelope}
               >
-                <Text style={[styles.formBtnText, { color: C.amberSignal }]}>ADD</Text>
+                <Text style={[styles.formBtnText, { color: C.amberSignal }]}>{t("settings.add_envelope")}</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : (
           <TouchableOpacity style={[styles.addBtn, { borderTopColor: C.wireGray }]} onPress={() => setShowAddEnvelope(true)}>
             <Feather name="plus" size={13} color={C.ghostText} />
-            <Text style={[styles.addBtnText, { color: C.ghostText }]}>ADD ENVELOPE</Text>
+            <Text style={[styles.addBtnText, { color: C.ghostText }]}>{t("settings.add_envelope")}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* ── RECURRING ENTRIES ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="RECURRING ENTRIES" />
+        <SectionHeader label={t("settings.recurring_entries")} />
         {(recurringTemplates as RecurringTemplate[]).length === 0 ? (
           <View style={[styles.emptyBox, { borderTopColor: C.wireGray }]}>
             <Text style={[styles.emptyText, { color: C.ghostText }]}>
-              No recurring entries yet — toggle one on the Add screen
+              {t("settings.no_recurring")}
             </Text>
           </View>
         ) : (
@@ -1071,9 +1094,9 @@ export default function SettingsScreen() {
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t.category}</Text>
+                <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{tc(t.category)}</Text>
                 <Text style={[styles.rowSub, { color: C.slateText }]}>
-                  {FREQ_LABELS[t.frequency]}{t.note ? `  ·  ${t.note}` : ""}
+                  {tf(t.frequency)}{t.note ? `  ·  ${t.note}` : ""}
                 </Text>
               </View>
               <Switch
@@ -1093,7 +1116,7 @@ export default function SettingsScreen() {
 
       {/* ── APP ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionHeader label="APP" />
+        <SectionHeader label={t("settings.app")} />
         <TouchableOpacity
           style={[styles.row, { borderTopColor: C.wireGray }]}
           onPress={() => router.push("/(app)/about")}
@@ -1102,8 +1125,8 @@ export default function SettingsScreen() {
             <Feather name="info" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>ABOUT LEDGER</Text>
-            <Text style={[styles.rowSub, { color: C.slateText }]}>Version, developer, and source info</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.about_ledger")}</Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>{t("settings.about_desc")}</Text>
           </View>
           <Feather name="chevron-right" size={14} color={C.ghostText} />
         </TouchableOpacity>
@@ -1111,15 +1134,16 @@ export default function SettingsScreen() {
 
       <View style={styles.about}>
         <Text style={[styles.aboutWordmark, { color: C.amberSignal }]}>LEDGER</Text>
-        <Text style={[styles.aboutLine, { color: C.ghostText }]}>{"// LOCAL ONLY · NO TRACKING · NO SYNC"}</Text>
+        <Text style={[styles.aboutLine, { color: C.ghostText }]}>{t("settings.footer_tag")}</Text>
         <Text style={[styles.aboutLine, { color: C.ghostText }]}>
-          SQLite on device. PIN and biometrics protect access.
+          {t("settings.footer_sub")}
         </Text>
       </View>
 
       {/* ── Modals ── */}
       <ExportModal visible={showExport} onClose={() => setShowExport(false)} />
       <ReportCard visible={showReport} onClose={() => setShowReport(false)} />
+      <LanguageSelector visible={showLanguage} onClose={() => setShowLanguage(false)} />
       <CurrencySelector visible={showCurrency} onClose={() => setShowCurrency(false)} />
       <ChangePinModal
         visible={showChangePin}

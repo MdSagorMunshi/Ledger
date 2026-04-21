@@ -13,25 +13,11 @@ import * as Haptics from "expo-haptics";
 import { useLedger, TransactionType } from "@/context/LedgerContext";
 import { TransactionRow } from "@/components/TransactionRow";
 import { getThemeColors } from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 type FilterType = "all" | TransactionType;
 type DateRange = "all" | "today" | "week" | "month" | "year" | "custom";
 type SortOrder = "newest" | "oldest";
-
-const TYPE_FILTERS: { label: string; value: FilterType }[] = [
-  { label: "ALL", value: "all" },
-  { label: "IN", value: "income" },
-  { label: "EXP", value: "expense" },
-];
-
-const DATE_RANGES: { label: string; value: DateRange }[] = [
-  { label: "ALL TIME", value: "all" },
-  { label: "TODAY", value: "today" },
-  { label: "WEEK", value: "week" },
-  { label: "MONTH", value: "month" },
-  { label: "YEAR", value: "year" },
-  { label: "CUSTOM", value: "custom" },
-];
 
 function startOf(unit: "today" | "week" | "month" | "year"): Date {
   const d = new Date();
@@ -62,8 +48,22 @@ function todayStr(): string {
 
 export default function History() {
   const { transactions, removeTransaction, formatAmount, appSettings } = useLedger();
+  const { t } = useI18n();
   const C = getThemeColors(appSettings.theme);
   const styles = getStyles(C);
+  const TYPE_FILTERS: { label: string; value: FilterType }[] = [
+    { label: t("history.all"), value: "all" },
+    { label: t("history.in"), value: "income" },
+    { label: t("history.exp"), value: "expense" },
+  ];
+  const DATE_RANGES: { label: string; value: DateRange }[] = [
+    { label: t("history.all"), value: "all" },
+    { label: t("history.today"), value: "today" },
+    { label: t("history.week"), value: "week" },
+    { label: t("history.month"), value: "month" },
+    { label: t("history.year"), value: "year" },
+    { label: t("history.custom"), value: "custom" },
+  ];
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
@@ -119,7 +119,7 @@ export default function History() {
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search entries..."
+            placeholder={t("history.search_entries")}
             placeholderTextColor={C.ghostText}
           />
           <TouchableOpacity
@@ -160,14 +160,14 @@ export default function History() {
               color={sortOrder !== "newest" ? C.amberSignal : C.slateText}
             />
             <Text style={[styles.sortBtnText, sortOrder !== "newest" && { color: C.amberSignal }]}>
-              {sortOrder === "newest" ? "NEWEST" : "OLDEST"}
+              {sortOrder === "newest" ? t("history.newest") : t("history.oldest")}
             </Text>
           </TouchableOpacity>
         </View>
 
         {showDatePanel && (
           <View style={styles.datePanel}>
-            <Text style={styles.datePanelLabel}>DATE RANGE</Text>
+            <Text style={styles.datePanelLabel}>{t("history.date_range")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.dateChips}>
                 {DATE_RANGES.map((r) => (
@@ -187,12 +187,12 @@ export default function History() {
             {dateRange === "custom" && (
               <View style={styles.customRange}>
                 <View style={styles.customRangeField}>
-                  <Text style={styles.customRangeLabel}>FROM</Text>
+                  <Text style={styles.customRangeLabel}>{t("history.from")}</Text>
                   <TextInput
                     style={styles.customRangeInput}
                     value={customFrom}
                     onChangeText={setCustomFrom}
-                    placeholder="YYYY-MM-DD"
+                    placeholder={t("history.date_placeholder")}
                     placeholderTextColor={C.ghostText}
                   />
                 </View>
@@ -200,12 +200,12 @@ export default function History() {
                   <Text style={styles.customRangeDash}>–</Text>
                 </View>
                 <View style={styles.customRangeField}>
-                  <Text style={styles.customRangeLabel}>TO</Text>
+                  <Text style={styles.customRangeLabel}>{t("history.to")}</Text>
                   <TextInput
                     style={styles.customRangeInput}
                     value={customTo}
                     onChangeText={setCustomTo}
-                    placeholder="YYYY-MM-DD"
+                    placeholder={t("history.date_placeholder")}
                     placeholderTextColor={C.ghostText}
                   />
                 </View>
@@ -217,7 +217,7 @@ export default function History() {
 
       <View style={styles.resultBar}>
         <Text style={styles.resultCount}>
-          {filtered.length} {filtered.length === 1 ? "ENTRY" : "ENTRIES"}
+          {filtered.length} {filtered.length === 1 ? t("history.entry") : t("history.entries")}
         </Text>
         {activeFilters > 0 && (
           <TouchableOpacity onPress={() => {
@@ -225,7 +225,7 @@ export default function History() {
             setDateRange("all");
             setSortOrder("newest");
           }}>
-            <Text style={styles.clearFilters}>CLEAR FILTERS</Text>
+            <Text style={styles.clearFilters}>{t("history.clear_filters")}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -233,7 +233,7 @@ export default function History() {
       {filtered.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptySymbol}>◈</Text>
-          <Text style={styles.emptyText}>NO ENTRIES MATCH</Text>
+          <Text style={styles.emptyText}>{t("history.no_entries_match")}</Text>
         </View>
       ) : (
         <FlatList

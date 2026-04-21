@@ -19,6 +19,7 @@ import {
   TransactionType,
 } from "@/context/LedgerContext";
 import { getThemeColors } from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 function today(): string {
   const d = new Date();
@@ -44,19 +45,16 @@ function FieldLabel({
   optional?: boolean;
   C: ReturnType<typeof getThemeColors>;
 }) {
+  const { t } = useI18n();
   return (
     <View style={styles.fieldLabelRow}>
       <Text style={[styles.fieldLabel, { color: C.ghostText }]}>{label}</Text>
-      {optional && <Text style={[styles.optionalLabel, { color: C.ghostText }]}>(OPTIONAL)</Text>}
+      {optional && <Text style={[styles.optionalLabel, { color: C.ghostText }]}>({t("common.optional")})</Text>}
     </View>
   );
 }
 
-const FREQ_OPTIONS: { label: string; value: "daily" | "weekly" | "monthly" }[] = [
-  { label: "DAILY", value: "daily" },
-  { label: "WEEKLY", value: "weekly" },
-  { label: "MONTHLY", value: "monthly" },
-];
+const FREQ_OPTIONS: ("daily" | "weekly" | "monthly")[] = ["daily", "weekly", "monthly"];
 
 type TransactionCategory =
   | (typeof INCOME_CATEGORIES)[number]
@@ -64,6 +62,7 @@ type TransactionCategory =
 
 export default function AddScreen() {
   const { addTransaction, addRecurringTemplate, currency, appSettings } = useLedger();
+  const { t, tc, tf } = useI18n();
   const C = getThemeColors(appSettings.theme);
 
   const [type, setType] = useState<TransactionType>("expense");
@@ -102,7 +101,7 @@ export default function AddScreen() {
   const handleSubmit = () => {
     const parsed = parseFloat(amount);
     if (!amount || isNaN(parsed) || parsed <= 0) {
-      setAmountError("Enter a valid positive amount");
+      setAmountError(t("add.valid_amount"));
       shakeAmount();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
@@ -148,7 +147,7 @@ export default function AddScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={[styles.formCard, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <Text style={[styles.sectionLabel, { color: C.ghostText }]}>NEW TRANSACTION</Text>
+        <Text style={[styles.sectionLabel, { color: C.ghostText }]}>{t("add.new_transaction")}</Text>
 
         <View style={styles.typeToggle}>
           <TouchableOpacity
@@ -160,7 +159,7 @@ export default function AddScreen() {
             onPress={() => setType2("income")}
           >
             <Feather name="arrow-up" size={14} color={type === "income" ? C.creditGreen : C.ghostText} />
-            <Text style={[styles.typeBtnText, { color: type === "income" ? C.creditGreen : C.ghostText }]}>INCOME</Text>
+            <Text style={[styles.typeBtnText, { color: type === "income" ? C.creditGreen : C.ghostText }]}>{t("add.income")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
@@ -171,12 +170,12 @@ export default function AddScreen() {
             onPress={() => setType2("expense")}
           >
             <Feather name="arrow-down" size={14} color={type === "expense" ? C.debitRed : C.ghostText} />
-            <Text style={[styles.typeBtnText, { color: type === "expense" ? C.debitRed : C.ghostText }]}>EXPENSE</Text>
+            <Text style={[styles.typeBtnText, { color: type === "expense" ? C.debitRed : C.ghostText }]}>{t("add.expense")}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.field}>
-          <FieldLabel label="AMOUNT" C={C} />
+          <FieldLabel label={t("add.amount")} C={C} />
           <Animated.View style={{ transform: [{ translateX: amountShake }] }}>
             <View style={[styles.amountInputWrapper, { backgroundColor: C.forgeBlack, borderColor: C.wireGray }]}>
               <Text style={[styles.currencySymbol, { color: C.slateText }]}>{currency.symbol}</Text>
@@ -184,7 +183,7 @@ export default function AddScreen() {
                 style={[styles.amountInput, { color: C.cipherWhite }]}
                 value={amount}
                 onChangeText={(v) => { setAmount(v); setAmountError(""); }}
-                placeholder="0.00"
+                placeholder={t("finances.amount_placeholder")}
                 placeholderTextColor={C.ghostText}
                 keyboardType="decimal-pad"
               />
@@ -194,7 +193,7 @@ export default function AddScreen() {
         </View>
 
         <View style={styles.field}>
-          <FieldLabel label="CATEGORY" C={C} />
+          <FieldLabel label={t("add.category")} C={C} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
             <View style={styles.categoryRow}>
               {categories.map((cat) => (
@@ -208,7 +207,7 @@ export default function AddScreen() {
                   onPress={() => setCategory(cat)}
                 >
                   <Text style={[styles.categoryChipText, { color: category === cat ? typeColor : C.slateText }]}>
-                    {cat}
+                    {tc(cat)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -217,55 +216,55 @@ export default function AddScreen() {
         </View>
 
         <View style={styles.field}>
-          <FieldLabel label="NOTE" optional C={C} />
+          <FieldLabel label={t("add.note")} optional C={C} />
           <TextInput
             style={[styles.input, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, color: C.cipherWhite }]}
             value={note}
             onChangeText={setNote}
-            placeholder="Describe this entry..."
+            placeholder={t("add.describe_entry")}
             placeholderTextColor={C.ghostText}
           />
         </View>
 
         <View style={styles.field}>
-          <FieldLabel label="DATE" C={C} />
+          <FieldLabel label={t("add.date")} C={C} />
           <TextInput
             style={[styles.input, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, color: C.cipherWhite }]}
             value={date}
             onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
+            placeholder={t("add.date_placeholder")}
             placeholderTextColor={C.ghostText}
           />
         </View>
 
         <View style={styles.field}>
           <View style={styles.fieldLabelRow}>
-            <Text style={[styles.fieldLabel, { color: C.ghostText }]}>TIME</Text>
+            <Text style={[styles.fieldLabel, { color: C.ghostText }]}>{t("add.time")}</Text>
             <TouchableOpacity
               style={[styles.nowBtn, { borderColor: `${C.amberSignal}60` }]}
               onPress={handleNowTime}
             >
               <Feather name="clock" size={10} color={C.amberSignal} />
-              <Text style={[styles.nowBtnText, { color: C.amberSignal }]}>NOW</Text>
+              <Text style={[styles.nowBtnText, { color: C.amberSignal }]}>{t("add.now")}</Text>
             </TouchableOpacity>
           </View>
           <TextInput
             style={[styles.input, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, color: C.cipherWhite }]}
             value={time}
             onChangeText={setTime}
-            placeholder="HH:MM:SS AM/PM"
+            placeholder={t("add.time_placeholder")}
             placeholderTextColor={C.ghostText}
             autoCapitalize="characters"
           />
-          <Text style={[styles.timeHint, { color: C.ghostText }]}>{"Format: 09:42:07 AM — tap NOW to refresh"}</Text>
+          <Text style={[styles.timeHint, { color: C.ghostText }]}>{t("add.time_hint")}</Text>
         </View>
 
         {/* RECURRING TOGGLE */}
         <View style={[styles.recurringSection, { borderColor: C.wireGray }]}>
           <View style={styles.recurringRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.recurringLabel, { color: C.cipherWhite }]}>RECURRING</Text>
-              <Text style={[styles.recurringSub, { color: C.slateText }]}>Auto-generate this entry on a schedule</Text>
+              <Text style={[styles.recurringLabel, { color: C.cipherWhite }]}>{t("add.recurring")}</Text>
+              <Text style={[styles.recurringSub, { color: C.slateText }]}>{t("add.recurring_desc")}</Text>
             </View>
             <Switch
               value={isRecurring}
@@ -278,16 +277,16 @@ export default function AddScreen() {
             <View style={styles.freqRow}>
               {FREQ_OPTIONS.map((f) => (
                 <TouchableOpacity
-                  key={f.value}
+                  key={f}
                   style={[
                     styles.freqChip,
-                    { borderColor: recurringFreq === f.value ? C.amberSignal : C.wireGray },
-                    recurringFreq === f.value && { backgroundColor: `${C.amberSignal}15` },
+                    { borderColor: recurringFreq === f ? C.amberSignal : C.wireGray },
+                    recurringFreq === f && { backgroundColor: `${C.amberSignal}15` },
                   ]}
-                  onPress={() => setRecurringFreq(f.value)}
+                  onPress={() => setRecurringFreq(f)}
                 >
-                  <Text style={[styles.freqChipText, { color: recurringFreq === f.value ? C.amberSignal : C.slateText }]}>
-                    {f.label}
+                  <Text style={[styles.freqChipText, { color: recurringFreq === f ? C.amberSignal : C.slateText }]}>
+                    {tf(f)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -299,7 +298,7 @@ export default function AddScreen() {
           style={[styles.submitBtn, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]}
           onPress={handleSubmit}
         >
-          <Text style={[styles.submitBtnText, { color: C.amberSignal }]}>+ RECORD TRANSACTION</Text>
+          <Text style={[styles.submitBtnText, { color: C.amberSignal }]}>{t("add.record_transaction")}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

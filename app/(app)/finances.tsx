@@ -8,11 +8,13 @@ import {
   Modal,
   TextInput,
   Switch,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useLedger, OweEntry, LendEntry, SavingsGoal } from "@/context/LedgerContext";
 import { computeNetWorth } from "@/utils/netWorth";
 import { getThemeColors } from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 function todayStr(): string {
   const d = new Date();
@@ -66,13 +68,18 @@ export default function FinancesScreen() {
     addSavingsGoal,
     deleteSavingsGoal,
     addOweEntry,
+    updateOweEntry,
+    deleteOweEntry,
     repayOweEntry,
     addLendEntry,
+    updateLendEntry,
+    deleteLendEntry,
     repayLendEntry,
     toggleLendNetWorth,
     addTransaction,
     formatAmount,
   } = useLedger();
+  const { t } = useI18n();
 
   const C = getThemeColors(appSettings.theme);
 
@@ -120,6 +127,7 @@ export default function FinancesScreen() {
   const [oweReason, setOweReason] = useState("");
   const [oweBorrowed, setOweBorrowed] = useState(todayStr());
   const [oweDue, setOweDue] = useState("");
+  const [editingOweId, setEditingOweId] = useState<string | null>(null);
   const [repayingOweId, setRepayingOweId] = useState<string | null>(null);
   const [repayAmt, setRepayAmt] = useState("");
   const [repayNote, setRepayNote] = useState("");
@@ -132,6 +140,7 @@ export default function FinancesScreen() {
   const [lendReason, setLendReason] = useState("");
   const [lendDate, setLendDate] = useState(todayStr());
   const [lendReturn, setLendReturn] = useState("");
+  const [editingLendId, setEditingLendId] = useState<string | null>(null);
   const [repayingLendId, setRepayingLendId] = useState<string | null>(null);
   const [lendRepayAmt, setLendRepayAmt] = useState("");
   const [lendRepayNote, setLendRepayNote] = useState("");
@@ -165,7 +174,7 @@ export default function FinancesScreen() {
       type: "expense",
       amount: amt,
       category: "Savings",
-      note: savNote || "Transfer to savings",
+      note: savNote || t("finances.transfer_to_savings"),
       date: savDate,
       subtype: "savings_transfer",
     });
@@ -188,7 +197,7 @@ export default function FinancesScreen() {
       type: "income",
       amount: amt,
       category: "Savings",
-      note: savNote || "Withdrawal from savings",
+      note: savNote || t("finances.withdraw_from_savings"),
       date: savDate,
       subtype: "savings_withdrawal",
     });
@@ -217,20 +226,148 @@ export default function FinancesScreen() {
     setShowAddGoal(false);
   };
 
+  const resetOweForm = () => {
+    setEditingOweId(null);
+    setOweName("");
+    setOweAmt("");
+    setOweReason("");
+    setOweBorrowed(todayStr());
+    setOweDue("");
+  };
+
+  const resetLendForm = () => {
+    setEditingLendId(null);
+    setLendName("");
+    setLendAmt("");
+    setLendReason("");
+    setLendDate(todayStr());
+    setLendReturn("");
+  };
+
+  const openOweEditor = (owe: OweEntry) => {
+    setEditingOweId(owe.id);
+    setOweName(owe.personName);
+    setOweAmt(String(owe.originalAmount));
+    setOweReason(owe.reason);
+    setOweBorrowed(owe.dateBorrowed);
+    setOweDue(owe.dueDate ?? "");
+    setShowAddOwe(true);
+  };
+
+  const openLendEditor = (lend: LendEntry) => {
+    setEditingLendId(lend.id);
+    setLendName(lend.personName);
+    setLendAmt(String(lend.originalAmount));
+    setLendReason(lend.reason);
+    setLendDate(lend.dateLent);
+    setLendReturn(lend.expectedReturnDate ?? "");
+    setShowAddLend(true);
+  };
+
+  const confirmDeleteOwe = (owe: OweEntry) => {
+    const repaymentCount = owe.repayments.length;
+    Alert.alert(
+      t("finances.remove_debt_title"),
+      repaymentCount > 0
+        ? `This will remove ${owe.personName}'s debt and ${repaymentCount} linked repayment ${repaymentCount === 1 ? "record" : "records"}.`
+        : `This will remove ${owe.personName}'s debt entry.`,
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("finances.remove"),
+          style: "destructive",
+          onPress: () => {
+            deleteOweEntry(owe.id);
+            if (repayingOweId === owe.id) {
+              setRepayingOweId(null);
+              setRepayAmt("");
+              setRepayNote("");
+              setRepayDate(todayStr());
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteLend = (lend: LendEntry) => {
+    const repaymentCount = lend.repayments.length;
+    Alert.alert(
+      t("finances.remove_lend_title"),
+      repaymentCount > 0
+        ? `This will remove ${lend.personName}'s record and ${repaymentCount} linked repayment ${repaymentCount === 1 ? "record" : "records"}.`
+        : `This will remove ${lend.personName}'s lending record.`,
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("finances.remove"),
+          style: "destructive",
+          onPress: () => {
+            deleteLendEntry(lend.id);
+            if (repayingLendId === lend.id) {
+              setRepayingLendId(null);
+              setLendRepayAmt("");
+              setLendRepayNote("");
+              setLendRepayDate(todayStr());
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const showOweActions = (owe: OweEntry) => {
+    Alert.alert(
+      owe.personName,
+      t("finances.choose_debt_action"),
+      [
+        { text: t("finances.edit"), onPress: () => openOweEditor(owe) },
+        { text: t("finances.remove"), style: "destructive", onPress: () => confirmDeleteOwe(owe) },
+        { text: t("common.cancel"), style: "cancel" },
+      ]
+    );
+  };
+
+  const showLendActions = (lend: LendEntry) => {
+    Alert.alert(
+      lend.personName,
+      t("finances.choose_lend_action"),
+      [
+        { text: t("finances.edit"), onPress: () => openLendEditor(lend) },
+        { text: t("finances.remove"), style: "destructive", onPress: () => confirmDeleteLend(lend) },
+        { text: t("common.cancel"), style: "cancel" },
+      ]
+    );
+  };
+
   const handleAddOwe = () => {
     const amt = parseFloat(oweAmt);
     if (!oweName.trim() || isNaN(amt) || amt <= 0) return;
-    addOweEntry({
-      personName: oweName.trim(),
-      originalAmount: amt,
-      remainingAmount: amt,
-      reason: oweReason.trim(),
-      dateBorrowed: oweBorrowed,
-      dueDate: oweDue || null,
-      status: "unpaid",
-      repayments: [],
-    });
-    setOweName(""); setOweAmt(""); setOweReason(""); setOweBorrowed(todayStr()); setOweDue("");
+    if (editingOweId) {
+      const current = oweEntries.find((entry) => entry.id === editingOweId);
+      if (!current) return;
+      const repaidAmount = current.originalAmount - current.remainingAmount;
+      updateOweEntry(editingOweId, {
+        personName: oweName.trim(),
+        originalAmount: amt,
+        remainingAmount: Math.max(0, amt - repaidAmount),
+        reason: oweReason.trim(),
+        dateBorrowed: oweBorrowed,
+        dueDate: oweDue || null,
+      });
+    } else {
+      addOweEntry({
+        personName: oweName.trim(),
+        originalAmount: amt,
+        remainingAmount: amt,
+        reason: oweReason.trim(),
+        dateBorrowed: oweBorrowed,
+        dueDate: oweDue || null,
+        status: "unpaid",
+        repayments: [],
+      });
+    }
+    resetOweForm();
     setShowAddOwe(false);
   };
 
@@ -241,7 +378,7 @@ export default function FinancesScreen() {
       type: "expense",
       amount: amt,
       category: "Debt Repayment",
-      note: repayNote || `Repayment to ${owe.personName}`,
+      note: repayNote || `${t("finances.record_repayment")} ${owe.personName}`,
       date: repayDate,
       subtype: "debt_repayment",
     });
@@ -252,18 +389,32 @@ export default function FinancesScreen() {
   const handleAddLend = () => {
     const amt = parseFloat(lendAmt);
     if (!lendName.trim() || isNaN(amt) || amt <= 0) return;
-    addLendEntry({
-      personName: lendName.trim(),
-      originalAmount: amt,
-      remainingAmount: amt,
-      reason: lendReason.trim(),
-      dateLent: lendDate,
-      expectedReturnDate: lendReturn || null,
-      status: "outstanding",
-      countInNetWorth: true,
-      repayments: [],
-    });
-    setLendName(""); setLendAmt(""); setLendReason(""); setLendDate(todayStr()); setLendReturn("");
+    if (editingLendId) {
+      const current = lendEntries.find((entry) => entry.id === editingLendId);
+      if (!current) return;
+      const repaidAmount = current.originalAmount - current.remainingAmount;
+      updateLendEntry(editingLendId, {
+        personName: lendName.trim(),
+        originalAmount: amt,
+        remainingAmount: Math.max(0, amt - repaidAmount),
+        reason: lendReason.trim(),
+        dateLent: lendDate,
+        expectedReturnDate: lendReturn || null,
+      });
+    } else {
+      addLendEntry({
+        personName: lendName.trim(),
+        originalAmount: amt,
+        remainingAmount: amt,
+        reason: lendReason.trim(),
+        dateLent: lendDate,
+        expectedReturnDate: lendReturn || null,
+        status: "outstanding",
+        countInNetWorth: true,
+        repayments: [],
+      });
+    }
+    resetLendForm();
     setShowAddLend(false);
   };
 
@@ -274,7 +425,7 @@ export default function FinancesScreen() {
       type: "income",
       amount: amt,
       category: "Lend Returned",
-      note: lendRepayNote || `Repayment from ${lend.personName}`,
+      note: lendRepayNote || `${t("finances.repayment_received")} ${lend.personName}`,
       date: lendRepayDate,
       subtype: "lend_returned",
     });
@@ -298,16 +449,16 @@ export default function FinancesScreen() {
     >
       {/* NET WORTH SUMMARY */}
       <View style={[styles.nwCard, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <Text style={[styles.nwHeading, { color: C.ghostText }]}>NET WORTH</Text>
+        <Text style={[styles.nwHeading, { color: C.ghostText }]}>{t("finances.net_worth")}</Text>
         <Text style={[styles.nwValue, { color: nwColor }]}>{formatAmount(nw.total)}</Text>
         <View style={styles.nwSubRow}>
           <View style={styles.nwSubItem}>
-            <Text style={[styles.nwSubLabel, { color: C.creditGreen }]}>ASSETS</Text>
+            <Text style={[styles.nwSubLabel, { color: C.creditGreen }]}>{t("finances.assets")}</Text>
             <Text style={[styles.nwSubAmount, { color: C.creditGreen }]}>{formatAmount(nw.totalAssets)}</Text>
           </View>
           <View style={[styles.nwSubDivider, { backgroundColor: C.wireGray }]} />
           <View style={styles.nwSubItem}>
-            <Text style={[styles.nwSubLabel, { color: C.debitRed }]}>LIABILITIES</Text>
+            <Text style={[styles.nwSubLabel, { color: C.debitRed }]}>{t("finances.liabilities")}</Text>
             <Text style={[styles.nwSubAmount, { color: C.debitRed }]}>{formatAmount(nw.totalLiabilities)}</Text>
           </View>
         </View>
@@ -316,7 +467,7 @@ export default function FinancesScreen() {
       {/* ASSETS BREAKDOWN */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
         <TouchableOpacity style={styles.collapsibleHeader} onPress={() => setAssetsExpanded((v) => !v)}>
-          <SLabel label="ASSETS" />
+          <SLabel label={t("finances.assets")} />
           <Feather name={assetsExpanded ? "chevron-up" : "chevron-down"} size={14} color={C.ghostText} />
         </TouchableOpacity>
         {assetsExpanded && (
@@ -350,7 +501,7 @@ export default function FinancesScreen() {
       {/* LIABILITIES BREAKDOWN */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
         <TouchableOpacity style={styles.collapsibleHeader} onPress={() => setLiabsExpanded((v) => !v)}>
-          <SLabel label="LIABILITIES" />
+          <SLabel label={t("finances.liabilities")} />
           <Feather name={liabsExpanded ? "chevron-up" : "chevron-down"} size={14} color={C.ghostText} />
         </TouchableOpacity>
         {liabsExpanded && (
@@ -377,7 +528,7 @@ export default function FinancesScreen() {
               />
             ))}
             {nw.totalLiabilities === 0 && (
-              <Text style={[styles.emptyText, { color: C.ghostText }]}>No liabilities</Text>
+              <Text style={[styles.emptyText, { color: C.ghostText }]}>{t("finances.no_liabilities")}</Text>
             )}
           </View>
         )}
@@ -389,14 +540,14 @@ export default function FinancesScreen() {
         onPress={() => { setEditingAsset(null); setShowAddAsset(true); }}
       >
         <Feather name="plus" size={14} color={C.amberSignal} />
-        <Text style={[styles.addAssetBtnText, { color: C.amberSignal }]}>ADD ASSET / LIABILITY</Text>
+        <Text style={[styles.addAssetBtnText, { color: C.amberSignal }]}>{t("finances.add_asset_liability")}</Text>
       </TouchableOpacity>
 
       {/* SAVINGS SECTION */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SLabel label="SAVINGS" />
+        <SLabel label={t("finances.savings")} />
         <View style={[styles.savingsSummary, { backgroundColor: C.forgeBlack, borderColor: C.wireGray }]}>
-          <Text style={[styles.savingsLabel, { color: C.ghostText }]}>POOL BALANCE</Text>
+          <Text style={[styles.savingsLabel, { color: C.ghostText }]}>{t("finances.pool_balance")}</Text>
           <Text style={[styles.savingsAmount, { color: C.creditGreen }]}>{formatAmount(savingsPool)}</Text>
         </View>
         <View style={styles.savingsActions}>
@@ -405,14 +556,14 @@ export default function FinancesScreen() {
             onPress={() => setShowTransferIn(true)}
           >
             <Feather name="arrow-up" size={12} color={C.creditGreen} />
-            <Text style={[styles.savingsBtnText, { color: C.creditGreen }]}>TRANSFER IN</Text>
+            <Text style={[styles.savingsBtnText, { color: C.creditGreen }]}>{t("finances.transfer_in")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.savingsBtn, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]}
             onPress={() => setShowWithdraw(true)}
           >
             <Feather name="arrow-down" size={12} color={C.debitRed} />
-            <Text style={[styles.savingsBtnText, { color: C.debitRed }]}>WITHDRAW</Text>
+            <Text style={[styles.savingsBtnText, { color: C.debitRed }]}>{t("finances.withdraw")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -425,14 +576,14 @@ export default function FinancesScreen() {
                   <View style={styles.goalTop}>
                     <Text style={[styles.goalLabel, { color: C.cipherWhite }]}>{g.label}</Text>
                     <View style={styles.goalRight}>
-                      {isFunded && <Badge text="FUNDED" color={C.creditGreen} />}
+                      {isFunded && <Badge text={t("finances.funded")} color={C.creditGreen} />}
                       <TouchableOpacity onPress={() => deleteSavingsGoal(g.id)}>
                         <Feather name="trash-2" size={12} color={C.ghostText} />
                       </TouchableOpacity>
                     </View>
                   </View>
                   <Text style={[styles.goalMeta, { color: C.slateText }]}>
-                    {formatAmount(g.allocatedAmount)} / {g.targetAmount ? formatAmount(g.targetAmount) : "Open Goal"}
+                    {formatAmount(g.allocatedAmount)} / {g.targetAmount ? formatAmount(g.targetAmount) : t("finances.open_goal")}
                     {g.deadline ? `  ·  Due ${g.deadline}` : ""}
                   </Text>
                   <ProgressBar value={g.allocatedAmount} max={g.targetAmount} C={C} />
@@ -447,32 +598,38 @@ export default function FinancesScreen() {
           onPress={() => setShowAddGoal(true)}
         >
           <Feather name="plus" size={12} color={C.ghostText} />
-          <Text style={[styles.addGoalBtnText, { color: C.ghostText }]}>ADD GOAL</Text>
+          <Text style={[styles.addGoalBtnText, { color: C.ghostText }]}>{t("finances.add_goal")}</Text>
         </TouchableOpacity>
       </View>
 
       {/* I OWE SECTION */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
         <View style={styles.sectionTopRow}>
-          <SLabel label="I OWE" />
+          <SLabel label={t("finances.i_owe")} />
           <TouchableOpacity
             style={[styles.sectionAddBtn, { borderColor: C.wireGray }]}
-            onPress={() => setShowAddOwe(true)}
+            onPress={() => {
+              resetOweForm();
+              setShowAddOwe(true);
+            }}
           >
             <Feather name="plus" size={11} color={C.ghostText} />
-            <Text style={[styles.sectionAddBtnText, { color: C.ghostText }]}>ADD</Text>
+            <Text style={[styles.sectionAddBtnText, { color: C.ghostText }]}>{t("finances.add")}</Text>
           </TouchableOpacity>
         </View>
         {activeOwe.length > 0 && (
           <Text style={[styles.oweSummary, { color: C.debitRed }]}>
-            Total: {formatAmount(activeOwe.reduce((s, o) => s + o.remainingAmount, 0))}
+            {t("finances.total")}: {formatAmount(activeOwe.reduce((s, o) => s + o.remainingAmount, 0))}
           </Text>
         )}
         {activeOwe.map((owe) => {
           const isOverdue = owe.dueDate && owe.dueDate < today && owe.status !== "settled";
           return (
-            <View
+            <TouchableOpacity
               key={owe.id}
+              activeOpacity={0.95}
+              delayLongPress={1500}
+              onLongPress={() => showOweActions(owe)}
               style={[
                 styles.oweCard,
                 { backgroundColor: C.forgeBlack, borderColor: C.wireGray },
@@ -484,13 +641,30 @@ export default function FinancesScreen() {
                   <Text style={[styles.oweName, { color: C.cipherWhite }]}>{owe.personName}</Text>
                   {!!owe.reason && <Text style={[styles.oweReason, { color: C.slateText }]}>{owe.reason}</Text>}
                   <Text style={[styles.oweDate, { color: C.ghostText }]}>
-                    Borrowed {owe.dateBorrowed}{owe.dueDate ? `  ·  Due ${owe.dueDate}` : ""}
+                    {t("finances.borrowed_on", { date: owe.dateBorrowed })}
+                    {owe.dueDate ? `  ·  ${t("finances.due_on", { date: owe.dueDate })}` : ""}
                   </Text>
                 </View>
-                <View style={styles.oweRight}>
-                  {isOverdue && <Text style={[styles.overdueLabel, { color: C.debitRed }]}>OVERDUE</Text>}
-                  <Text style={[styles.oweRemaining, { color: C.debitRed }]}>{formatAmount(owe.remainingAmount)}</Text>
-                  <Text style={[styles.oweOriginal, { color: C.ghostText }]}>of {formatAmount(owe.originalAmount)}</Text>
+                <View style={styles.oweSide}>
+                  <View style={styles.cardActionRow}>
+                    <TouchableOpacity
+                      onPress={() => openOweEditor(owe)}
+                      style={styles.cardActionBtn}
+                    >
+                      <Feather name="edit-2" size={12} color={C.ghostText} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => confirmDeleteOwe(owe)}
+                      style={styles.cardActionBtn}
+                    >
+                      <Feather name="trash-2" size={12} color={C.ghostText} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.oweRight}>
+                    {isOverdue && <Text style={[styles.overdueLabel, { color: C.debitRed }]}>{t("finances.overdue")}</Text>}
+                    <Text style={[styles.oweRemaining, { color: C.debitRed }]}>{formatAmount(owe.remainingAmount)}</Text>
+                    <Text style={[styles.oweOriginal, { color: C.ghostText }]}>{t("finances.of")} {formatAmount(owe.originalAmount)}</Text>
+                  </View>
                 </View>
               </View>
               {repayingOweId === owe.id ? (
@@ -499,7 +673,7 @@ export default function FinancesScreen() {
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={repayAmt}
                     onChangeText={setRepayAmt}
-                    placeholder={`Amount (max ${formatAmount(owe.remainingAmount)})`}
+                    placeholder={t("finances.amount_max_placeholder", { amount: formatAmount(owe.remainingAmount) })}
                     placeholderTextColor={C.ghostText}
                     keyboardType="decimal-pad"
                   />
@@ -507,28 +681,28 @@ export default function FinancesScreen() {
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={repayNote}
                     onChangeText={setRepayNote}
-                    placeholder="Note (optional)"
+                    placeholder={t("finances.note_placeholder")}
                     placeholderTextColor={C.ghostText}
                   />
                   <TextInput
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={repayDate}
                     onChangeText={setRepayDate}
-                    placeholder="YYYY-MM-DD"
+                    placeholder={t("finances.date_placeholder")}
                     placeholderTextColor={C.ghostText}
                   />
                   <View style={styles.repayBtns}>
                     <TouchableOpacity
-                      style={[styles.repayBtn, { borderColor: C.wireGray }]}
-                      onPress={() => setRepayingOweId(null)}
-                    >
-                      <Text style={[styles.repayBtnText, { color: C.slateText }]}>CANCEL</Text>
+                    style={[styles.repayBtn, { borderColor: C.wireGray }]}
+                    onPress={() => setRepayingOweId(null)}
+                  >
+                      <Text style={[styles.repayBtnText, { color: C.slateText }]}>{t("common.cancel")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.repayBtn, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15`, flex: 1 }]}
                       onPress={() => handleRepayOwe(owe)}
                     >
-                      <Text style={[styles.repayBtnText, { color: C.creditGreen }]}>RECORD REPAYMENT</Text>
+                      <Text style={[styles.repayBtnText, { color: C.creditGreen }]}>{t("finances.record_repayment")}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -542,55 +716,83 @@ export default function FinancesScreen() {
                     setRepayNote("");
                   }}
                 >
-                  <Text style={[styles.repayTriggerText, { color: C.debitRed }]}>REPAY</Text>
+                  <Text style={[styles.repayTriggerText, { color: C.debitRed }]}>{t("finances.repay")}</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </TouchableOpacity>
           );
         })}
         {settledOwe.length > 0 && (
           <TouchableOpacity style={styles.settledToggle} onPress={() => setSettledExpanded((v) => !v)}>
             <Text style={[styles.settledToggleText, { color: C.ghostText }]}>
-              SETTLED ({settledOwe.length}) {settledExpanded ? "▲" : "▼"}
+              {t("finances.settled")} ({settledOwe.length}) {settledExpanded ? "▲" : "▼"}
             </Text>
           </TouchableOpacity>
         )}
         {settledExpanded && settledOwe.map((owe) => (
-          <View key={owe.id} style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}>
+          <TouchableOpacity
+            key={owe.id}
+            activeOpacity={0.95}
+            delayLongPress={1500}
+            onLongPress={() => showOweActions(owe)}
+            style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}
+          >
             <View style={styles.oweTop}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.oweName, { color: C.cipherWhite }]}>{owe.personName}</Text>
                 {!!owe.reason && <Text style={[styles.oweReason, { color: C.slateText }]}>{owe.reason}</Text>}
               </View>
-              <Badge text="SETTLED" color={C.ghostText} />
+              <View style={styles.oweSide}>
+                <View style={styles.cardActionRow}>
+                  <TouchableOpacity
+                    onPress={() => openOweEditor(owe)}
+                    style={styles.cardActionBtn}
+                  >
+                    <Feather name="edit-2" size={12} color={C.ghostText} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteOwe(owe)}
+                    style={styles.cardActionBtn}
+                  >
+                    <Feather name="trash-2" size={12} color={C.ghostText} />
+                  </TouchableOpacity>
+                </View>
+                <Badge text={t("finances.settled")} color={C.ghostText} />
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
 
       {/* I LENT SECTION */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
         <View style={styles.sectionTopRow}>
-          <SLabel label="I LENT" />
+          <SLabel label={t("finances.i_lent")} />
           <TouchableOpacity
             style={[styles.sectionAddBtn, { borderColor: C.wireGray }]}
-            onPress={() => setShowAddLend(true)}
+            onPress={() => {
+              resetLendForm();
+              setShowAddLend(true);
+            }}
           >
             <Feather name="plus" size={11} color={C.ghostText} />
-            <Text style={[styles.sectionAddBtnText, { color: C.ghostText }]}>ADD</Text>
+            <Text style={[styles.sectionAddBtnText, { color: C.ghostText }]}>{t("finances.add")}</Text>
           </TouchableOpacity>
         </View>
         {activeLend.length > 0 && (
           <Text style={[styles.oweSummary, { color: C.creditGreen }]}>
-            Total: {formatAmount(activeLend.reduce((s, l) => s + l.remainingAmount, 0))}
+            {t("finances.total")}: {formatAmount(activeLend.reduce((s, l) => s + l.remainingAmount, 0))}
           </Text>
         )}
         {activeLend.map((lend) => {
           const isOverdue =
             lend.expectedReturnDate && lend.expectedReturnDate < today && lend.status !== "returned";
           return (
-            <View
+            <TouchableOpacity
               key={lend.id}
+              activeOpacity={0.95}
+              delayLongPress={1500}
+              onLongPress={() => showLendActions(lend)}
               style={[
                 styles.oweCard,
                 { backgroundColor: C.forgeBlack, borderColor: C.wireGray },
@@ -602,18 +804,35 @@ export default function FinancesScreen() {
                   <Text style={[styles.oweName, { color: C.cipherWhite }]}>{lend.personName}</Text>
                   {!!lend.reason && <Text style={[styles.oweReason, { color: C.slateText }]}>{lend.reason}</Text>}
                   <Text style={[styles.oweDate, { color: C.ghostText }]}>
-                    Lent {lend.dateLent}{lend.expectedReturnDate ? `  ·  Due ${lend.expectedReturnDate}` : ""}
+                    {t("finances.lent_on", { date: lend.dateLent })}
+                    {lend.expectedReturnDate ? `  ·  ${t("finances.due_on", { date: lend.expectedReturnDate })}` : ""}
                   </Text>
                 </View>
-                <View style={styles.oweRight}>
-                  {isOverdue && <Text style={[styles.overdueLabel, { color: C.amberSignal }]}>OVERDUE</Text>}
-                  <Text style={[styles.oweRemaining, { color: C.creditGreen }]}>{formatAmount(lend.remainingAmount)}</Text>
-                  <Text style={[styles.oweOriginal, { color: C.ghostText }]}>of {formatAmount(lend.originalAmount)}</Text>
+                <View style={styles.oweSide}>
+                  <View style={styles.cardActionRow}>
+                    <TouchableOpacity
+                      onPress={() => openLendEditor(lend)}
+                      style={styles.cardActionBtn}
+                    >
+                      <Feather name="edit-2" size={12} color={C.ghostText} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => confirmDeleteLend(lend)}
+                      style={styles.cardActionBtn}
+                    >
+                      <Feather name="trash-2" size={12} color={C.ghostText} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.oweRight}>
+                    {isOverdue && <Text style={[styles.overdueLabel, { color: C.amberSignal }]}>{t("finances.overdue")}</Text>}
+                    <Text style={[styles.oweRemaining, { color: C.creditGreen }]}>{formatAmount(lend.remainingAmount)}</Text>
+                    <Text style={[styles.oweOriginal, { color: C.ghostText }]}>{t("finances.of")} {formatAmount(lend.originalAmount)}</Text>
+                  </View>
                 </View>
               </View>
               <View style={styles.lendToggleRow}>
                 <Text style={[styles.lendToggleLabel, { color: lend.countInNetWorth ? C.slateText : C.ghostText }]}>
-                  COUNT IN NET WORTH
+                  {t("finances.count_in_net_worth")}
                 </Text>
                 <Switch
                   value={lend.countInNetWorth}
@@ -624,7 +843,7 @@ export default function FinancesScreen() {
                 />
               </View>
               {!lend.countInNetWorth && (
-                <Text style={[styles.excludedNote, { color: C.ghostText }]}>Excluded from net worth</Text>
+                <Text style={[styles.excludedNote, { color: C.ghostText }]}>{t("finances.excluded_net_worth")}</Text>
               )}
               {repayingLendId === lend.id ? (
                 <View style={styles.repayForm}>
@@ -632,7 +851,7 @@ export default function FinancesScreen() {
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={lendRepayAmt}
                     onChangeText={setLendRepayAmt}
-                    placeholder={`Amount received`}
+                    placeholder={t("finances.amount_received_placeholder")}
                     placeholderTextColor={C.ghostText}
                     keyboardType="decimal-pad"
                   />
@@ -640,14 +859,14 @@ export default function FinancesScreen() {
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={lendRepayNote}
                     onChangeText={setLendRepayNote}
-                    placeholder="Note (optional)"
+                    placeholder={t("finances.note_placeholder")}
                     placeholderTextColor={C.ghostText}
                   />
                   <TextInput
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={lendRepayDate}
                     onChangeText={setLendRepayDate}
-                    placeholder="YYYY-MM-DD"
+                    placeholder={t("finances.date_placeholder")}
                     placeholderTextColor={C.ghostText}
                   />
                   <View style={styles.repayBtns}>
@@ -655,13 +874,13 @@ export default function FinancesScreen() {
                       style={[styles.repayBtn, { borderColor: C.wireGray }]}
                       onPress={() => setRepayingLendId(null)}
                     >
-                      <Text style={[styles.repayBtnText, { color: C.slateText }]}>CANCEL</Text>
+                      <Text style={[styles.repayBtnText, { color: C.slateText }]}>{t("common.cancel")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.repayBtn, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15`, flex: 1 }]}
                       onPress={() => handleRepayLend(lend)}
                     >
-                      <Text style={[styles.repayBtnText, { color: C.creditGreen }]}>RECORD RECEIVED</Text>
+                      <Text style={[styles.repayBtnText, { color: C.creditGreen }]}>{t("finances.record_received")}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -675,36 +894,58 @@ export default function FinancesScreen() {
                     setLendRepayNote("");
                   }}
                 >
-                  <Text style={[styles.repayTriggerText, { color: C.creditGreen }]}>REPAYMENT RECEIVED</Text>
+                  <Text style={[styles.repayTriggerText, { color: C.creditGreen }]}>{t("finances.repayment_received")}</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </TouchableOpacity>
           );
         })}
         {returnedLend.length > 0 && (
           <TouchableOpacity style={styles.settledToggle} onPress={() => setLendSettledExpanded((v) => !v)}>
             <Text style={[styles.settledToggleText, { color: C.ghostText }]}>
-              RETURNED ({returnedLend.length}) {lendSettledExpanded ? "▲" : "▼"}
+              {t("finances.returned")} ({returnedLend.length}) {lendSettledExpanded ? "▲" : "▼"}
             </Text>
           </TouchableOpacity>
         )}
         {lendSettledExpanded && returnedLend.map((lend) => (
-          <View key={lend.id} style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}>
+          <TouchableOpacity
+            key={lend.id}
+            activeOpacity={0.95}
+            delayLongPress={1500}
+            onLongPress={() => showLendActions(lend)}
+            style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}
+          >
             <View style={styles.oweTop}>
-              <Text style={[styles.oweName, { color: C.cipherWhite }]}>{lend.personName}</Text>
-              <Badge text="RETURNED" color={C.ghostText} />
+              <Text style={[styles.oweName, { color: C.cipherWhite, flex: 1 }]}>{lend.personName}</Text>
+              <View style={styles.oweSide}>
+                <View style={styles.cardActionRow}>
+                  <TouchableOpacity
+                    onPress={() => openLendEditor(lend)}
+                    style={styles.cardActionBtn}
+                  >
+                    <Feather name="edit-2" size={12} color={C.ghostText} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteLend(lend)}
+                    style={styles.cardActionBtn}
+                  >
+                    <Feather name="trash-2" size={12} color={C.ghostText} />
+                  </TouchableOpacity>
+                </View>
+                <Badge text={t("finances.returned")} color={C.ghostText} />
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
 
       {/* OVERLAYS */}
-      <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); setEditingAsset(null); }} C={C} title={editingAsset ? "EDIT ENTRY" : "ADD ASSET / LIABILITY"}>
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>LABEL</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetLabel} onChangeText={setAssetLabel} placeholder="e.g. Savings Account" placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>VALUE</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetValue} onChangeText={setAssetValue} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>TYPE</Text>
+      <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); setEditingAsset(null); }} C={C} title={editingAsset ? `${t("finances.edit")} ${t("finances.type")}` : t("finances.add_asset_liability")}>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.label")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetLabel} onChangeText={setAssetLabel} placeholder={t("finances.asset_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.value")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetValue} onChangeText={setAssetValue} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.type")}</Text>
         <View style={styles.typeToggle}>
           {(["asset", "liability"] as const).map((t) => (
             <TouchableOpacity key={t} style={[styles.typeBtn, { borderColor: assetType === t ? C.amberSignal : C.wireGray, backgroundColor: assetType === t ? `${C.amberSignal}15` : "transparent" }]} onPress={() => setAssetType(t)}>
@@ -713,79 +954,95 @@ export default function FinancesScreen() {
           ))}
         </View>
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]} onPress={handleAddAsset}>
-          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{editingAsset ? "UPDATE" : "ADD"}</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{editingAsset ? t("common.update") : t("common.add")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
-      <SimpleOverlay visible={showTransferIn} onClose={() => setShowTransferIn(false)} C={C} title="TRANSFER IN">
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>GOAL (OPTIONAL)</Text>
+      <SimpleOverlay visible={showTransferIn} onClose={() => setShowTransferIn(false)} C={C} title={t("finances.transfer_in")}>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.goal_optional")}</Text>
         <GoalSelector goals={savingsGoals} selected={savGoalId} onSelect={setSavGoalId} C={C} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>NOTE (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savNote} onChangeText={setSavNote} placeholder="Note..." placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.note_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savNote} onChangeText={setSavNote} placeholder={t("finances.note_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.date")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15` }]} onPress={handleTransferIn}>
-          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>TRANSFER</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>{t("finances.transfer_in")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
-      <SimpleOverlay visible={showWithdraw} onClose={() => setShowWithdraw(false)} C={C} title="WITHDRAW">
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>FROM GOAL (OPTIONAL)</Text>
+      <SimpleOverlay visible={showWithdraw} onClose={() => setShowWithdraw(false)} C={C} title={t("finances.withdraw")}>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.from_goal_optional")}</Text>
         <GoalSelector goals={savingsGoals} selected={savGoalId} onSelect={setSavGoalId} C={C} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>NOTE (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savNote} onChangeText={setSavNote} placeholder="Note..." placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.note_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savNote} onChangeText={setSavNote} placeholder={t("finances.note_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.date")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]} onPress={handleWithdraw}>
-          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>WITHDRAW</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>{t("finances.withdraw")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
-      <SimpleOverlay visible={showAddGoal} onClose={() => setShowAddGoal(false)} C={C} title="ADD GOAL">
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>LABEL</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalLabel} onChangeText={setGoalLabel} placeholder="e.g. Emergency Fund" placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>TARGET AMOUNT (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalTarget} onChangeText={setGoalTarget} placeholder="Leave empty for open goal" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DEADLINE (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalDeadline} onChangeText={setGoalDeadline} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+      <SimpleOverlay visible={showAddGoal} onClose={() => setShowAddGoal(false)} C={C} title={t("finances.add_goal")}>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.label")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalLabel} onChangeText={setGoalLabel} placeholder={t("finances.goal_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.target_amount_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalTarget} onChangeText={setGoalTarget} placeholder={t("finances.open_goal")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.deadline_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={goalDeadline} onChangeText={setGoalDeadline} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]} onPress={handleAddGoal}>
-          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>ADD GOAL</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{t("finances.add_goal")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
-      <SimpleOverlay visible={showAddOwe} onClose={() => setShowAddOwe(false)} C={C} title="ADD OWE ENTRY">
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>PERSON NAME</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweName} onChangeText={setOweName} placeholder="Name" placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweAmt} onChangeText={setOweAmt} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>REASON (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweReason} onChangeText={setOweReason} placeholder="Reason..." placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE BORROWED</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweBorrowed} onChangeText={setOweBorrowed} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DUE DATE (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweDue} onChangeText={setOweDue} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+      <SimpleOverlay
+        visible={showAddOwe}
+        onClose={() => {
+          setShowAddOwe(false);
+          resetOweForm();
+        }}
+        C={C}
+        title={editingOweId ? t("finances.edit_owe_entry") : t("finances.add_owe_entry")}
+      >
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.person_name")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweName} onChangeText={setOweName} placeholder={t("finances.name_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweAmt} onChangeText={setOweAmt} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.reason_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweReason} onChangeText={setOweReason} placeholder={t("finances.reason_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.date_borrowed")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweBorrowed} onChangeText={setOweBorrowed} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.due_date_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={oweDue} onChangeText={setOweDue} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]} onPress={handleAddOwe}>
-          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>ADD OWE ENTRY</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>{editingOweId ? t("finances.update_owe_entry") : t("finances.add_owe_entry")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
-      <SimpleOverlay visible={showAddLend} onClose={() => setShowAddLend(false)} C={C} title="ADD LEND ENTRY">
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>PERSON NAME</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendName} onChangeText={setLendName} placeholder="Name" placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>AMOUNT</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendAmt} onChangeText={setLendAmt} placeholder="0.00" placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>REASON (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendReason} onChangeText={setLendReason} placeholder="Reason..." placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>DATE LENT</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendDate} onChangeText={setLendDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>EXPECTED RETURN DATE (OPTIONAL)</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendReturn} onChangeText={setLendReturn} placeholder="YYYY-MM-DD" placeholderTextColor={C.ghostText} />
+      <SimpleOverlay
+        visible={showAddLend}
+        onClose={() => {
+          setShowAddLend(false);
+          resetLendForm();
+        }}
+        C={C}
+        title={editingLendId ? t("finances.edit_lend_entry") : t("finances.add_lend_entry")}
+      >
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.person_name")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendName} onChangeText={setLendName} placeholder={t("finances.name_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendAmt} onChangeText={setLendAmt} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.reason_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendReason} onChangeText={setLendReason} placeholder={t("finances.reason_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.date_lent")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendDate} onChangeText={setLendDate} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.expected_return_date_optional")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={lendReturn} onChangeText={setLendReturn} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15` }]} onPress={handleAddLend}>
-          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>ADD LEND ENTRY</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>{editingLendId ? t("finances.update_lend_entry") : t("finances.add_lend_entry")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
     </ScrollView>
@@ -1116,6 +1373,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  oweSide: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
   oweName: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 13,
@@ -1131,6 +1392,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   oweRight: { alignItems: "flex-end", gap: 2 },
+  cardActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  cardActionBtn: {
+    padding: 2,
+  },
   oweRemaining: {
     fontFamily: "JetBrainsMono_600SemiBold",
     fontSize: 14,

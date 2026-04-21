@@ -12,6 +12,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { getThemeColors } from "@/constants/colors";
 import { useLedger } from "@/context/LedgerContext";
+import { useI18n } from "@/utils/i18n";
 import { exportPlain, exportEncrypted } from "@/utils/export";
 
 interface ExportModalProps {
@@ -36,6 +37,7 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
 
   const [encrypting, setEncrypting] = useState(false);
   const C = getThemeColors(appSettings.theme);
+  const { t } = useI18n();
 
   const buildState = () => ({
     transactions,
@@ -54,7 +56,7 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
     try {
       await exportPlain(buildState());
     } catch (e: any) {
-      Alert.alert("Export Error", e?.message ?? "Failed to export.");
+      Alert.alert(t("export.error"), e?.message ?? t("export.failed"));
     } finally {
       onClose();
     }
@@ -66,7 +68,7 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
     try {
       await exportEncrypted(buildState(), pin);
     } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Encryption failed.");
+      Alert.alert(t("settings.error"), e?.message ?? t("export.encrypt_error"));
     } finally {
       setEncrypting(false);
       onClose();
@@ -80,22 +82,22 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
           <TouchableWithoutFeedback>
             <View style={[styles.modal, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
               <View style={styles.header}>
-                <Text style={[styles.title, { color: C.cipherWhite }]}>EXPORT DATA</Text>
+                <Text style={[styles.title, { color: C.cipherWhite }]}>{t("export.title")}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Feather name="x" size={18} color={C.slateText} />
                 </TouchableOpacity>
               </View>
               <Text style={[styles.subtitle, { color: C.slateText }]}>
-                {transactions.length} TRANSACTIONS · V1 FORMAT
+                {t("export.transactions_v1", { count: transactions.length })}
               </Text>
 
               <TouchableOpacity
                 style={[styles.btn, { backgroundColor: C.inkSurface, borderColor: C.wireGray }]}
                 onPress={handlePlain}
               >
-                <Text style={[styles.btnLabel, { color: C.cipherWhite }]}>PLAIN JSON</Text>
+                <Text style={[styles.btnLabel, { color: C.cipherWhite }]}>{t("export.plain_json")}</Text>
                 <Text style={[styles.btnDesc, { color: C.slateText }]}>
-                  Readable by any text editor · Full v1 snapshot
+                  {t("export.plain_desc")}
                 </Text>
               </TouchableOpacity>
 
@@ -108,10 +110,10 @@ export function ExportModal({ visible, onClose }: ExportModalProps) {
                 disabled={encrypting}
               >
                 <Text style={[styles.btnLabel, { color: C.amberSignal }]}>
-                  {encrypting ? "ENCRYPTING..." : "ENCRYPTED"}
+                  {encrypting ? t("export.encrypting") : t("export.encrypted")}
                 </Text>
                 <Text style={[styles.btnDesc, { color: C.slateText }]}>
-                  Secured with your PIN via AES-GCM
+                  {t("export.encrypted_desc")}
                 </Text>
               </TouchableOpacity>
             </View>

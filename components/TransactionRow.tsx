@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, TouchableOpacity } from "react-native
 import { Feather } from "@expo/vector-icons";
 import { getThemeColors } from "@/constants/colors";
 import { Transaction, useLedger } from "@/context/LedgerContext";
+import { useI18n } from "@/utils/i18n";
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -12,16 +13,20 @@ interface TransactionRowProps {
   showDelete?: boolean;
 }
 
-function getSubtypeDisplay(tx: Transaction, C: ReturnType<typeof getThemeColors>) {
+function getSubtypeDisplay(
+  tx: Transaction,
+  C: ReturnType<typeof getThemeColors>,
+  t: (key: string) => string
+) {
   switch (tx.subtype) {
     case "savings_transfer":
-      return { iconName: "archive" as const, label: "→ Savings", color: C.slateText };
+      return { iconName: "archive" as const, label: t("row.savings_in"), color: C.slateText };
     case "savings_withdrawal":
-      return { iconName: "archive" as const, label: "← Savings", color: C.slateText };
+      return { iconName: "archive" as const, label: t("row.savings_out"), color: C.slateText };
     case "debt_repayment":
-      return { iconName: "credit-card" as const, label: "Debt Repayment", color: C.debitRed };
+      return { iconName: "credit-card" as const, label: t("row.debt_repayment"), color: C.debitRed };
     case "lend_returned":
-      return { iconName: "corner-down-left" as const, label: "Lend Returned", color: C.creditGreen };
+      return { iconName: "corner-down-left" as const, label: t("row.lend_returned"), color: C.creditGreen };
     default:
       return null;
   }
@@ -35,11 +40,12 @@ export function TransactionRow({
   showDelete,
 }: TransactionRowProps) {
   const { appSettings } = useLedger();
+  const { t, tc } = useI18n();
   const C = getThemeColors(appSettings.theme);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const isIncome = transaction.type === "income";
 
-  const subtypeDisplay = getSubtypeDisplay(transaction, C);
+  const subtypeDisplay = getSubtypeDisplay(transaction, C, t);
   const amountColor = subtypeDisplay?.color ?? (isIncome ? C.creditGreen : C.debitRed);
   const prefix = subtypeDisplay
     ? subtypeDisplay.color === C.creditGreen
@@ -74,7 +80,7 @@ export function TransactionRow({
       <Feather name={iconName} size={20} color={amountColor} style={styles.icon} />
       <View style={styles.info}>
         <View style={styles.categoryRow}>
-          <Text style={[styles.category, { color: C.cipherWhite }]}>{transaction.category}</Text>
+          <Text style={[styles.category, { color: C.cipherWhite }]}>{tc(transaction.category)}</Text>
           {subtypeDisplay && (
             <View style={[styles.subtypeBadge, { borderColor: amountColor }]}>
               <Text style={[styles.subtypeBadgeText, { color: amountColor }]}>{subtypeDisplay.label}</Text>

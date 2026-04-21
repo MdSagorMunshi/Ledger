@@ -13,6 +13,7 @@ import { useLedger } from "@/context/LedgerContext";
 import { PinDots } from "@/components/PinDots";
 import { PinKeypad } from "@/components/PinKeypad";
 import colors from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 type PinMode = "setup" | "confirm" | "unlock";
 
@@ -21,6 +22,7 @@ const COOLDOWN_SECONDS = 30;
 
 export default function PinGate() {
   const { setupPin, unlock, pin, isUnlocked, biometricEnabled, isHydrated } = useLedger();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<PinMode>("unlock");
 
@@ -72,9 +74,9 @@ export default function PinGate() {
     if (Platform.OS === "web") return;
     try {
       const LocalAuth = await import("expo-local-authentication");
-      const result = await LocalAuth.authenticateAsync({
-        promptMessage: "Unlock LEDGER",
-        cancelLabel: "Use PIN",
+        const result = await LocalAuth.authenticateAsync({
+        promptMessage: t("pin.unlock_prompt"),
+        cancelLabel: t("pin.use_pin"),
         disableDeviceFallback: true,
       });
       if (result.success) {
@@ -140,7 +142,7 @@ export default function PinGate() {
       if (entered === setupFirst) {
         setupPin(entered);
       } else {
-        setError("PINs do not match — try again");
+        setError(t("pin.mismatch"));
         triggerShake();
         setInput("");
         setMode("setup");
@@ -152,14 +154,15 @@ export default function PinGate() {
         const newAttempts = failedAttempts + 1;
         setFailedAttempts(newAttempts);
         if (newAttempts >= MAX_ATTEMPTS) {
-          setError(`Too many attempts — wait ${COOLDOWN_SECONDS}s`);
+          setError(t("pin.too_many_attempts", { seconds: COOLDOWN_SECONDS }));
           startCooldown(COOLDOWN_SECONDS);
           setFailedAttempts(0);
         } else {
           const remaining = MAX_ATTEMPTS - newAttempts;
-          setError(
-            `Incorrect PIN — ${remaining} attempt${remaining === 1 ? "" : "s"} remaining`
-          );
+          setError(t("pin.incorrect_remaining", {
+            count: remaining,
+            suffix: remaining === 1 ? "" : "s",
+          }));
         }
         triggerShake();
         setInput("");
@@ -181,7 +184,7 @@ export default function PinGate() {
               <Feather name="shield" size={32} color={C.amberSignal} />
               <Text style={styles.brandText}>LEDGER</Text>
             </View>
-            <Text style={styles.tagline}>LOADING VAULT...</Text>
+            <Text style={styles.tagline}>{t("pin.loading_vault")}</Text>
           </View>
         </View>
       </View>
@@ -191,10 +194,10 @@ export default function PinGate() {
   const statusText = isLocked
     ? `LOCKED — ${cooldownSecsLeft}s`
     : mode === "setup"
-    ? "SET A 4-DIGIT PIN"
+    ? t("pin.set_pin")
     : mode === "confirm"
-    ? "CONFIRM YOUR PIN"
-    : "ENTER PIN TO UNLOCK";
+    ? t("pin.confirm_pin")
+    : t("pin.enter_pin");
 
   const showBioBtn = mode === "unlock" && biometricEnabled && bioAvailable && !isLocked;
 
@@ -206,7 +209,7 @@ export default function PinGate() {
             <Feather name="shield" size={32} color={C.amberSignal} />
             <Text style={styles.brandText}>LEDGER</Text>
           </View>
-          <Text style={styles.tagline}>SECURE OFFLINE TRACKER</Text>
+          <Text style={styles.tagline}>{t("pin.secure_tracker")}</Text>
         </View>
 
         <View style={styles.pinSection}>
@@ -224,11 +227,11 @@ export default function PinGate() {
         {showBioBtn ? (
           <TouchableOpacity style={styles.bioBtn} onPress={triggerBiometrics} activeOpacity={0.7}>
             <Feather name="user-check" size={20} color={C.amberSignal} />
-            <Text style={styles.bioBtnText}>USE BIOMETRICS</Text>
+            <Text style={styles.bioBtnText}>{t("pin.use_biometrics")}</Text>
           </TouchableOpacity>
         ) : (
           <Text style={styles.footer}>
-            Your data stays on this device. Export and backup files can be encrypted.
+            {t("pin.footer")}
           </Text>
         )}
       </View>

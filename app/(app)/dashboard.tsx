@@ -17,6 +17,7 @@ import { DonutChart } from "@/components/DonutChart";
 import { computeBudgetProgress } from "@/utils/analytics";
 import { computeNetWorth } from "@/utils/netWorth";
 import { getThemeColors } from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 function SectionLabel({ label, C }: { label: string; C: ReturnType<typeof getThemeColors> }) {
   return <Text style={[styles.sectionLabel, { color: C.ghostText }]}>{label}</Text>;
@@ -28,6 +29,7 @@ function BudgetAlert({ category, pct, remaining, C }: {
   remaining: number;
   C: ReturnType<typeof getThemeColors>;
 }) {
+  const { t, tc } = useI18n();
   const opacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.sequence([
@@ -41,8 +43,10 @@ function BudgetAlert({ category, pct, remaining, C }: {
     <Animated.View style={[styles.budgetAlert, { borderColor: color, opacity }]}>
       <Feather name="alert-triangle" size={11} color={color} />
       <Text style={[styles.budgetAlertText, { color }]}>
-        ⚑ {category.toUpperCase()} BUDGET AT {Math.round(pct * 100)}%
-        {remaining < 0 ? ` — ${Math.abs(remaining).toFixed(0)} OVER` : ` — ${remaining.toFixed(0)} REMAINING`}
+        ⚑ {tc(category).toUpperCase()} {t("dashboard.budget_at")} {Math.round(pct * 100)}%
+        {remaining < 0
+          ? ` — ${Math.abs(remaining).toFixed(0)} ${t("dashboard.over")}`
+          : ` — ${remaining.toFixed(0)} ${t("dashboard.remaining")}`}
       </Text>
     </Animated.View>
   );
@@ -62,6 +66,7 @@ export default function Dashboard() {
   } = useLedger();
 
   const C = getThemeColors(appSettings.theme);
+  const { t, tc } = useI18n();
 
   const regularTxs = transactions.filter(
     (t) => t.subtype !== "savings_transfer" && t.subtype !== "savings_withdrawal"
@@ -125,12 +130,12 @@ export default function Dashboard() {
     return (
       <View style={[styles.emptyState, { backgroundColor: C.forgeBlack }]}>
         <Text style={[styles.emptySymbol, { color: C.ghostText }]}>◈</Text>
-        <Text style={[styles.emptyLabel, { color: C.ghostText }]}>NO TRANSACTIONS YET</Text>
+        <Text style={[styles.emptyLabel, { color: C.ghostText }]}>{t("dashboard.no_transactions")}</Text>
         <TouchableOpacity
           style={[styles.emptyBtn, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]}
           onPress={() => router.navigate("/(app)/add")}
         >
-          <Text style={[styles.emptyBtnText, { color: C.amberSignal }]}>+ ADD FIRST ENTRY</Text>
+          <Text style={[styles.emptyBtnText, { color: C.amberSignal }]}>{t("dashboard.add_first_entry")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -161,25 +166,25 @@ export default function Dashboard() {
       )}
 
       <View style={styles.summaryRow}>
-        <SummaryCard label="BALANCE" amount={formatAmount(Math.abs(balance))} color={balanceColor} flex={1.3} />
-        <SummaryCard label="INCOME" amount={formatAmount(totalIncome)} color={C.creditGreen} />
-        <SummaryCard label="EXPENSES" amount={formatAmount(totalExpense)} color={C.debitRed} />
+        <SummaryCard label={t("dashboard.balance")} amount={formatAmount(Math.abs(balance))} color={balanceColor} flex={1.3} />
+        <SummaryCard label={t("dashboard.income")} amount={formatAmount(totalIncome)} color={C.creditGreen} />
+        <SummaryCard label={t("dashboard.expenses")} amount={formatAmount(totalExpense)} color={C.debitRed} />
       </View>
 
       {/* NET WORTH MINI CARD */}
       <View style={[styles.nwMini, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <Text style={[styles.nwMiniLabel, { color: C.ghostText }]}>NET WORTH</Text>
+        <Text style={[styles.nwMiniLabel, { color: C.ghostText }]}>{t("dashboard.net_worth")}</Text>
         <Text style={[styles.nwMiniValue, { color: nwColor }]}>{formatAmount(nw.total)}</Text>
       </View>
 
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionLabel label="MONTHLY OVERVIEW" C={C} />
+        <SectionLabel label={t("dashboard.monthly_overview")} C={C} />
         <BarChart transactions={regularTxs} formatAmount={formatAmount} />
       </View>
 
       {regularTxs.some((t) => t.type === "expense") && (
         <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-          <SectionLabel label="EXPENSE BREAKDOWN" C={C} />
+          <SectionLabel label={t("dashboard.expense_breakdown")} C={C} />
           <DonutChart transactions={regularTxs} formatAmount={formatAmount} />
           {/* BUDGET ENVELOPE INDICATORS */}
           {budgetEnvelopes.length > 0 && (
@@ -190,7 +195,7 @@ export default function Dashboard() {
                 const barColor = pct >= 1 ? C.debitRed : pct >= 0.8 ? C.amberSignal : C.ghostText;
                 return (
                   <View key={env.id} style={styles.envelopeItem}>
-                    <Text style={[styles.envelopeCat, { color: C.slateText }]}>{env.category}</Text>
+                    <Text style={[styles.envelopeCat, { color: C.slateText }]}>{tc(env.category)}</Text>
                     <View style={[styles.envelopeBar, { backgroundColor: C.wireGray }]}>
                       <View style={[styles.envelopeFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
                     </View>
@@ -203,7 +208,7 @@ export default function Dashboard() {
       )}
 
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionLabel label="RECENT ENTRIES" C={C} />
+        <SectionLabel label={t("dashboard.recent_entries")} C={C} />
         {recentFive.map((tx) => (
           <TransactionRow
             key={tx.id}

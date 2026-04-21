@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -9,56 +9,53 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { getThemeColors } from "@/constants/colors";
-import { CURRENCIES, Currency, useLedger } from "@/context/LedgerContext";
-import { useI18n } from "@/utils/i18n";
+import { useLedger, type AppLanguage } from "@/context/LedgerContext";
+import { SUPPORTED_LANGUAGES, useI18n } from "@/utils/i18n";
 
-interface CurrencySelectorProps {
+interface LanguageSelectorProps {
   visible: boolean;
   onClose: () => void;
 }
 
-export function CurrencySelector({ visible, onClose }: CurrencySelectorProps) {
-  const { currency, setCurrency, appSettings } = useLedger();
+export function LanguageSelector({ visible, onClose }: LanguageSelectorProps) {
+  const { appSettings, updateAppSettings } = useLedger();
   const { t } = useI18n();
   const C = getThemeColors(appSettings.theme);
 
-  const handleSelect = (c: Currency) => {
-    setCurrency(c);
+  const handleSelect = (language: AppLanguage) => {
+    updateAppSettings({ language });
     onClose();
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={[styles.modal, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
               <View style={styles.header}>
-                <Text style={[styles.title, { color: C.cipherWhite }]}>{t("currency.title")}</Text>
+                <Text style={[styles.title, { color: C.cipherWhite }]}>{t("settings.select_language")}</Text>
                 <TouchableOpacity onPress={onClose}>
                   <Feather name="x" size={18} color={C.slateText} />
                 </TouchableOpacity>
               </View>
-              {CURRENCIES.map((c) => (
+              {SUPPORTED_LANGUAGES.map((language) => (
                 <TouchableOpacity
-                  key={c.code}
+                  key={language.code}
                   style={[
                     styles.item,
-                    c.code === currency.code && {
+                    appSettings.language === language.code && {
                       borderColor: C.amberSignal,
                       backgroundColor: `${C.amberSignal}14`,
                     },
                   ]}
-                  onPress={() => handleSelect(c)}
+                  onPress={() => handleSelect(language.code)}
                 >
-                  <Text style={[styles.symbol, { color: C.amberSignal }]}>{c.symbol}</Text>
-                  <Text style={[styles.code, { color: C.cipherWhite }]}>{c.code}</Text>
-                  {c.code === currency.code && (
+                  <View style={{ gap: 2 }}>
+                    <Text style={[styles.nativeName, { color: C.cipherWhite }]}>{language.nativeName}</Text>
+                    <Text style={[styles.englishName, { color: C.slateText }]}>{language.englishName}</Text>
+                  </View>
+                  {appSettings.language === language.code && (
                     <Feather
                       name="check"
                       size={14}
@@ -89,8 +86,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 20,
     width: "100%",
-    maxWidth: 280,
-    gap: 4,
+    maxWidth: 320,
+    gap: 6,
   },
   header: {
     flexDirection: "row",
@@ -107,21 +104,18 @@ const styles = StyleSheet.create({
   item: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "transparent",
   },
-  symbol: {
-    fontFamily: "JetBrainsMono_600SemiBold",
-    fontSize: 16,
-    width: 24,
-    textAlign: "center",
-  },
-  code: {
+  nativeName: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 13,
+  },
+  englishName: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
   },
 });

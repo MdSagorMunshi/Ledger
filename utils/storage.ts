@@ -50,6 +50,7 @@ type SettingsRow = {
   theme: AppSettings["theme"];
   auto_lock_minutes: number | null;
   default_currency_code: string;
+  language: AppSettings["language"];
 };
 
 type OweRepaymentRow = Omit<OweRepayment, "ledgerTxId"> & {
@@ -67,6 +68,7 @@ const SETTINGS_ROW_ID = 1;
 const SCHEMA_VERSION = 1;
 const DEFAULT_THEME: AppSettings["theme"] = "dark";
 const DEFAULT_CURRENCY_CODE = "BDT";
+const DEFAULT_LANGUAGE: AppSettings["language"] = "en";
 const CURRENCY_SYMBOLS: Record<string, string> = {
   BDT: "৳",
   USD: "$",
@@ -116,7 +118,8 @@ async function initDb(): Promise<SQLiteDatabase> {
       last_backup_path TEXT,
       theme TEXT NOT NULL DEFAULT 'dark',
       auto_lock_minutes INTEGER,
-      default_currency_code TEXT NOT NULL DEFAULT 'BDT'
+      default_currency_code TEXT NOT NULL DEFAULT 'BDT',
+      language TEXT NOT NULL DEFAULT 'en'
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -227,13 +230,22 @@ async function initDb(): Promise<SQLiteDatabase> {
     );
   `);
 
+  try {
+    await db.runAsync(
+      `ALTER TABLE app_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en'`
+    );
+  } catch {
+    // Column already exists on upgraded installs.
+  }
+
   await db.runAsync(
     `INSERT OR IGNORE INTO app_settings (
-      id, theme, default_currency_code
-    ) VALUES (?, ?, ?)`,
+      id, theme, default_currency_code, language
+    ) VALUES (?, ?, ?, ?)`,
     SETTINGS_ROW_ID,
     DEFAULT_THEME,
-    DEFAULT_CURRENCY_CODE
+    DEFAULT_CURRENCY_CODE,
+    DEFAULT_LANGUAGE
   );
 
   return db;
@@ -492,7 +504,8 @@ async function loadSettingsRow(db: SQLiteDatabase): Promise<SettingsRow> {
       last_backup_path,
       theme,
       auto_lock_minutes,
-      default_currency_code
+      default_currency_code,
+      language
      FROM app_settings
      WHERE id = ?`,
     SETTINGS_ROW_ID
@@ -510,6 +523,7 @@ async function loadSettingsRow(db: SQLiteDatabase): Promise<SettingsRow> {
       theme: DEFAULT_THEME,
       auto_lock_minutes: null,
       default_currency_code: DEFAULT_CURRENCY_CODE,
+      language: DEFAULT_LANGUAGE,
     }
   );
 }
@@ -736,6 +750,7 @@ async function buildStateFromDb(db: SQLiteDatabase, settings: SettingsRow): Prom
       theme: settings.theme,
       autoLockMinutes: settings.auto_lock_minutes,
       defaultCurrencyCode: settings.default_currency_code,
+      language: settings.language,
     },
     currency: {
       code: settings.default_currency_code,
@@ -862,7 +877,8 @@ export async function saveVault(
                last_backup_path = ?,
                theme = ?,
                auto_lock_minutes = ?,
-               default_currency_code = ?
+               default_currency_code = ?,
+               language = ?
            WHERE id = ?`,
           pin,
           toInt(state.biometricEnabled),
@@ -874,6 +890,7 @@ export async function saveVault(
           state.appSettings.theme,
           state.appSettings.autoLockMinutes,
           state.currency.code,
+          state.appSettings.language,
           SETTINGS_ROW_ID
         );
       }
@@ -934,10 +951,12 @@ export async function deleteVault(): Promise<void> {
              last_backup_path = NULL,
              theme = ?,
              auto_lock_minutes = NULL,
-             default_currency_code = ?
+             default_currency_code = ?,
+             language = ?
          WHERE id = ?`,
         DEFAULT_THEME,
         DEFAULT_CURRENCY_CODE,
+        DEFAULT_LANGUAGE,
         SETTINGS_ROW_ID
       );
     });

@@ -16,6 +16,7 @@ import {
   computeIncomeStability,
 } from "@/utils/analytics";
 import { getThemeColors } from "@/constants/colors";
+import { useI18n } from "@/utils/i18n";
 
 function SLabel({ label }: { label: string }) {
   return <Text style={styles.sLabel}>{label}</Text>;
@@ -67,6 +68,7 @@ function Sparkline({
 
 export default function AnalyticsScreen() {
   const { transactions, appSettings, formatAmount } = useLedger();
+  const { t, tc } = useI18n();
   const C = getThemeColors(appSettings.theme);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
@@ -88,18 +90,18 @@ export default function AnalyticsScreen() {
     >
       {/* SPENDING VELOCITY */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SLabel label="SPENDING VELOCITY" />
+        <SLabel label={t("analytics.spending_velocity")} />
         {!velocity.hasEnoughData ? (
           <View style={styles.noData}>
             <Text style={[styles.noDataText, { color: C.ghostText }]}>
-              NOT ENOUGH DATA — KEEP ADDING ENTRIES
+              {t("analytics.not_enough_data")}
             </Text>
           </View>
         ) : (
           <>
             <View style={styles.velocityRow}>
               <View style={styles.velocityItem}>
-                <Text style={[styles.velocityPeriodLabel, { color: C.slateText }]}>THIS MONTH</Text>
+                <Text style={[styles.velocityPeriodLabel, { color: C.slateText }]}>{t("analytics.this_month")}</Text>
                 <Text style={[styles.velocityAmount, { color: C.cipherWhite }]}>
                   {formatAmount(velocity.thisMonthDaily)}/day
                 </Text>
@@ -116,7 +118,7 @@ export default function AnalyticsScreen() {
                 )}
               </View>
               <View style={[styles.velocityItem, { alignItems: "flex-end" }]}>
-                <Text style={[styles.velocityPeriodLabel, { color: C.slateText }]}>LAST MONTH</Text>
+                <Text style={[styles.velocityPeriodLabel, { color: C.slateText }]}>{t("analytics.last_month")}</Text>
                 <Text style={[styles.velocityAmount, { color: C.cipherWhite }]}>
                   {formatAmount(velocity.lastMonthDaily)}/day
                 </Text>
@@ -124,10 +126,10 @@ export default function AnalyticsScreen() {
             </View>
             <Text style={[styles.velocityInterpretation, { color: C.slateText }]}>
               {velocity.direction === "up"
-                ? `SPENDING ${formatAmount(velocity.diffPerDay)} MORE PER DAY THAN LAST MONTH`
+                ? t("analytics.more_per_day", { amount: formatAmount(velocity.diffPerDay) })
                 : velocity.direction === "down"
-                ? `SPENDING ${formatAmount(velocity.diffPerDay)} LESS PER DAY THAN LAST MONTH`
-                : "SPENDING PACE SIMILAR TO LAST MONTH"}
+                ? t("analytics.less_per_day", { amount: formatAmount(velocity.diffPerDay) })
+                : t("analytics.similar_pace")}
             </Text>
           </>
         )}
@@ -135,7 +137,7 @@ export default function AnalyticsScreen() {
 
       {/* WEEKLY PATTERN HEATMAP */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SLabel label="WEEKLY PATTERN" />
+        <SLabel label={t("analytics.weekly_pattern")} />
         <View style={styles.heatmapRow}>
           {heatmap.map((day) => {
             const intensity = day.hasData ? 0.03 + (day.average / heatmapMax) * 0.27 : 0;
@@ -165,10 +167,10 @@ export default function AnalyticsScreen() {
 
       {/* CATEGORY TREND LINES */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SLabel label="CATEGORY TRENDS" />
+        <SLabel label={t("analytics.category_trends")} />
         {trends.length === 0 ? (
           <Text style={[styles.noDataText, { color: C.ghostText }]}>
-            No expense data yet
+            {t("analytics.no_expense_data")}
           </Text>
         ) : (
           <View style={styles.trendsContainer}>
@@ -191,7 +193,7 @@ export default function AnalyticsScreen() {
                     }
                   >
                     <Text style={[styles.trendCategory, { color: C.cipherWhite }]}>
-                      {trend.category}
+                      {tc(trend.category)}
                     </Text>
                     <View style={styles.trendRight}>
                       <Sparkline
@@ -212,10 +214,10 @@ export default function AnalyticsScreen() {
                     <View style={[styles.trendDetail, { backgroundColor: C.forgeBlack, borderColor: C.wireGray }]}>
                       <View style={styles.trendDetailHeader}>
                         <Text style={[styles.trendDetailTitle, { color: C.slateText }]}>
-                          {trend.category.toUpperCase()} TRANSACTIONS
+                          {t("analytics.category_transactions", { category: tc(trend.category).toUpperCase() })}
                         </Text>
                         <TouchableOpacity onPress={() => setExpandedCategory(null)}>
-                          <Text style={[styles.trendClose, { color: C.amberSignal }]}>CLOSE</Text>
+                          <Text style={[styles.trendClose, { color: C.amberSignal }]}>{t("analytics.close")}</Text>
                         </TouchableOpacity>
                       </View>
                       {catTxs.map((tx) => (
@@ -245,10 +247,10 @@ export default function AnalyticsScreen() {
 
       {/* INCOME STABILITY */}
       <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SLabel label="INCOME STABILITY" />
+        <SLabel label={t("analytics.income_stability")} />
         {!stability.hasEnoughData ? (
           <Text style={[styles.noDataText, { color: C.ghostText }]}>
-            ADD AT LEAST 3 MONTHS OF DATA TO SEE YOUR STABILITY SCORE
+            {t("analytics.stability_need_data")}
           </Text>
         ) : (
           <>

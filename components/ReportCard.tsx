@@ -13,11 +13,7 @@ import { Feather } from "@expo/vector-icons";
 import { useLedger } from "@/context/LedgerContext";
 import { getAvailableMonths, getMonthTransactions, computeBudgetProgress } from "@/utils/analytics";
 import { getThemeColors } from "@/constants/colors";
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+import { LANGUAGE_TO_LOCALE, useI18n } from "@/utils/i18n";
 
 function getWeekOfMonth(dateStr: string): number {
   const d = new Date(dateStr + "T00:00:00");
@@ -33,6 +29,7 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
     appSettings,
     currency,
   } = useLedger();
+  const { t, tc, language } = useI18n();
 
   const C = getThemeColors(appSettings.theme);
 
@@ -54,7 +51,11 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
   };
 
   const [year, month] = selectedMonth.split("-").map(Number);
-  const monthName = MONTH_NAMES[month - 1];
+  const locale = LANGUAGE_TO_LOCALE[language];
+  const monthName = new Intl.DateTimeFormat(locale, { month: "long" }).format(
+    new Date(year, month - 1, 1)
+  );
+  const generatedDate = new Intl.DateTimeFormat(locale).format(new Date());
 
   const monthTxs = useMemo(
     () => getMonthTransactions(transactions, year, month - 1),
@@ -103,7 +104,7 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
     const rows = monthTxs
       .map(
         (tx) =>
-          `<tr><td>${tx.date}</td><td>${tx.category}</td><td>${tx.note || "—"}</td><td style="color:${tx.type === "income" ? "#166534" : "#991b1b"};text-align:right">${tx.type === "income" ? "+" : "-"}${formatAmount(tx.amount)}</td></tr>`
+          `<tr><td>${tx.date}</td><td>${tc(tx.category)}</td><td>${tx.note || "—"}</td><td style="color:${tx.type === "income" ? "#166534" : "#991b1b"};text-align:right">${tx.type === "income" ? "+" : "-"}${formatAmount(tx.amount)}</td></tr>`
       )
       .join("");
 
@@ -111,7 +112,7 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
       .slice(0, 5)
       .map(
         ([cat, amt]) =>
-          `<tr><td>${cat}</td><td style="text-align:right">${formatAmount(amt)}</td><td style="text-align:right">${totalExpenses > 0 ? Math.round((amt / totalExpenses) * 100) : 0}%</td></tr>`
+          `<tr><td>${tc(cat)}</td><td style="text-align:right">${formatAmount(amt)}</td><td style="text-align:right">${totalExpenses > 0 ? Math.round((amt / totalExpenses) * 100) : 0}%</td></tr>`
       )
       .join("");
 
@@ -129,19 +130,19 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
       .footer{text-align:center;color:#9ca3af;font-size:10px;margin-top:24px}
     </style></head><body>
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div><h1>LEDGER</h1><div style="font-size:10px;color:#6b7280">Generated ${new Date().toLocaleDateString()}</div></div>
-        <div style="text-align:right"><div style="font-size:12px;color:#374151;letter-spacing:2px">MONTHLY REPORT</div><div style="font-size:13px">${monthName} ${year}</div></div>
+        <div><h1>LEDGER</h1><div style="font-size:10px;color:#6b7280">${t("report.generated", { date: generatedDate })}</div></div>
+        <div style="text-align:right"><div style="font-size:12px;color:#374151;letter-spacing:2px">${t("report.monthly_report")}</div><div style="font-size:13px">${monthName} ${year}</div></div>
       </div>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">
       <div class="summary">
-        <div class="metric"><div class="metric-label">NET INCOME</div><div class="metric-value" style="color:#166534">${formatAmount(totalIncome)}</div></div>
-        <div class="metric"><div class="metric-label">TOTAL EXPENSES</div><div class="metric-value" style="color:#991b1b">${formatAmount(totalExpenses)}</div></div>
-        <div class="metric"><div class="metric-label">NET</div><div class="metric-value" style="color:${net >= 0 ? "#166534" : "#991b1b"}">${formatAmount(net)}</div></div>
+        <div class="metric"><div class="metric-label">${t("report.net_income")}</div><div class="metric-value" style="color:#166534">${formatAmount(totalIncome)}</div></div>
+        <div class="metric"><div class="metric-label">${t("report.total_expenses")}</div><div class="metric-value" style="color:#991b1b">${formatAmount(totalExpenses)}</div></div>
+        <div class="metric"><div class="metric-label">${t("report.net")}</div><div class="metric-value" style="color:${net >= 0 ? "#166534" : "#991b1b"}">${formatAmount(net)}</div></div>
       </div>
-      ${catRows ? `<h2>TOP EXPENSE CATEGORIES</h2><table><thead><tr><th>CATEGORY</th><th style="text-align:right">SPENT</th><th style="text-align:right">% OF TOTAL</th></tr></thead><tbody>${catRows}</tbody></table>` : ""}
-      <h2>TRANSACTION LOG</h2>
-      <table><thead><tr><th>DATE</th><th>CATEGORY</th><th>NOTE</th><th style="text-align:right">AMOUNT</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="footer">Generated by LEDGER — offline · private · yours</div>
+      ${catRows ? `<h2>${t("report.top_expense_categories")}</h2><table><thead><tr><th>${t("report.category")}</th><th style="text-align:right">${t("report.spent")}</th><th style="text-align:right">${t("report.percent_total")}</th></tr></thead><tbody>${catRows}</tbody></table>` : ""}
+      <h2>${t("report.transaction_log")}</h2>
+      <table><thead><tr><th>DATE</th><th>${t("report.category")}</th><th>${t("report.note")}</th><th style="text-align:right">${t("report.amount")}</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="footer">${t("report.generated_by")}</div>
     </body></html>`;
   };
 
@@ -177,7 +178,7 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
         console.warn("[Report] Share fallback error:", fallbackError);
       }
 
-      Alert.alert("Report Error", "Could not open the print dialog or save the PDF.");
+          Alert.alert(t("report.error"), t("report.failed"));
     }
   };
 
@@ -211,10 +212,10 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
             <View style={styles.docHeader}>
               <View>
                 <Text style={styles.wordmark}>LEDGER</Text>
-                <Text style={styles.exportDate}>Generated {new Date().toLocaleDateString()}</Text>
+                <Text style={styles.exportDate}>{t("report.generated", { date: generatedDate })}</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.reportTitle}>MONTHLY REPORT</Text>
+                <Text style={styles.reportTitle}>{t("report.monthly_report")}</Text>
                 <Text style={styles.reportPeriod}>{monthName} {year}</Text>
               </View>
             </View>
@@ -223,24 +224,24 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
 
             {/* SUMMARY ROW */}
             <View style={styles.summaryRow}>
-              <MetricBox label="NET INCOME" value={formatAmount(totalIncome)} color="#166534" />
-              <MetricBox label="TOTAL EXPENSES" value={formatAmount(totalExpenses)} color="#991b1b" />
-              <MetricBox label="NET" value={formatAmount(net)} color={net >= 0 ? "#166534" : "#991b1b"} />
+              <MetricBox label={t("report.net_income")} value={formatAmount(totalIncome)} color="#166534" />
+              <MetricBox label={t("report.total_expenses")} value={formatAmount(totalExpenses)} color="#991b1b" />
+              <MetricBox label={t("report.net")} value={formatAmount(net)} color={net >= 0 ? "#166534" : "#991b1b"} />
             </View>
 
             {/* TOP 3 EXPENSE CATEGORIES */}
             {top3.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>TOP EXPENSE CATEGORIES</Text>
+                <Text style={styles.sectionTitle}>{t("report.top_expense_categories")}</Text>
                 <View style={styles.table}>
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHead, { flex: 2 }]}>CATEGORY</Text>
-                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>SPENT</Text>
-                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>% OF TOTAL</Text>
+                    <Text style={[styles.tableHead, { flex: 2 }]}>{t("report.category")}</Text>
+                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>{t("report.spent")}</Text>
+                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>{t("report.percent_total")}</Text>
                   </View>
                   {top3.map(([cat, amt]) => (
                     <View key={cat} style={styles.tableRow}>
-                      <Text style={[styles.tableCell, { flex: 2 }]}>{cat}</Text>
+                      <Text style={[styles.tableCell, { flex: 2 }]}>{tc(cat)}</Text>
                       <Text style={[styles.tableCell, { flex: 1, textAlign: "right" }]}>{formatAmount(amt)}</Text>
                       <Text style={[styles.tableCell, { flex: 1, textAlign: "right" }]}>
                         {totalExpenses > 0 ? Math.round((amt / totalExpenses) * 100) : 0}%
@@ -254,13 +255,13 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
             {/* BUDGET PERFORMANCE */}
             {budgetEnvelopes.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>BUDGET PERFORMANCE</Text>
+                <Text style={styles.sectionTitle}>{t("report.budget_performance")}</Text>
                 <View style={styles.table}>
                   <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHead, { flex: 2 }]}>CATEGORY</Text>
-                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>LIMIT</Text>
-                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>SPENT</Text>
-                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>REM.</Text>
+                    <Text style={[styles.tableHead, { flex: 2 }]}>{t("report.category")}</Text>
+                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>{t("report.limit")}</Text>
+                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>{t("report.spent")}</Text>
+                    <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>{t("report.remaining_short")}</Text>
                   </View>
                   {budgetEnvelopes.map((env) => {
                     const spent = computeBudgetProgress(transactions, env.category);
@@ -270,11 +271,11 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
                     return (
                       <View key={env.id}>
                         <View style={styles.tableRow}>
-                          <Text style={[styles.tableCell, { flex: 2 }]}>{env.category}</Text>
+                          <Text style={[styles.tableCell, { flex: 2 }]}>{tc(env.category)}</Text>
                           <Text style={[styles.tableCell, { flex: 1, textAlign: "right" }]}>{formatAmount(env.monthlyLimit)}</Text>
                           <Text style={[styles.tableCell, { flex: 1, textAlign: "right" }]}>{formatAmount(spent)}</Text>
                           <Text style={[styles.tableCell, { flex: 1, textAlign: "right", color: remaining < 0 ? "#991b1b" : "#166534" }]}>
-                            {formatAmount(Math.abs(remaining))}{remaining < 0 ? " over" : ""}
+                            {formatAmount(Math.abs(remaining))}{remaining < 0 ? ` ${t("report.over")}` : ""}
                           </Text>
                         </View>
                         <View style={[styles.budgetBarTrack]}>
@@ -289,7 +290,7 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
 
             {/* WEEKLY BAR CHART */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>WEEKLY BREAKDOWN</Text>
+              <Text style={styles.sectionTitle}>{t("report.weekly_breakdown")}</Text>
               <View style={styles.weekChart}>
                 {weeklyData.map((w, i) => (
                   <View key={i} style={styles.weekCol}>
@@ -303,11 +304,11 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
                 <View style={styles.weekLegend}>
                   <View style={styles.weekLegendItem}>
                     <View style={[styles.weekLegendDot, { backgroundColor: "#166534" }]} />
-                    <Text style={styles.weekLegendText}>Income</Text>
+                    <Text style={styles.weekLegendText}>{t("report.income")}</Text>
                   </View>
                   <View style={styles.weekLegendItem}>
                     <View style={[styles.weekLegendDot, { backgroundColor: "#991b1b" }]} />
-                    <Text style={styles.weekLegendText}>Expenses</Text>
+                    <Text style={styles.weekLegendText}>{t("report.expenses")}</Text>
                   </View>
                 </View>
               </View>
@@ -315,20 +316,20 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
 
             {/* TRANSACTION LOG */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>TRANSACTION LOG</Text>
+              <Text style={styles.sectionTitle}>{t("report.transaction_log")}</Text>
               <View style={styles.table}>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.tableHead, { flex: 1 }]}>DATE</Text>
-                  <Text style={[styles.tableHead, { flex: 1.5 }]}>CATEGORY</Text>
-                  <Text style={[styles.tableHead, { flex: 2 }]}>NOTE</Text>
-                  <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>AMOUNT</Text>
+                  <Text style={[styles.tableHead, { flex: 1.5 }]}>{t("report.category")}</Text>
+                  <Text style={[styles.tableHead, { flex: 2 }]}>{t("report.note")}</Text>
+                  <Text style={[styles.tableHead, { flex: 1, textAlign: "right" }]}>{t("report.amount")}</Text>
                 </View>
                 {monthTxs.map((tx) => {
                   const isIncome = tx.type === "income";
                   return (
                     <View key={tx.id} style={styles.tableRow}>
                       <Text style={[styles.tableCell, { flex: 1, fontSize: 10 }]}>{tx.date}</Text>
-                      <Text style={[styles.tableCell, { flex: 1.5, fontSize: 10 }]}>{tx.category}</Text>
+                      <Text style={[styles.tableCell, { flex: 1.5, fontSize: 10 }]}>{tc(tx.category)}</Text>
                       <Text style={[styles.tableCell, { flex: 2, fontSize: 10 }]} numberOfLines={1}>{tx.note || "—"}</Text>
                       <Text style={[styles.tableCell, { flex: 1, textAlign: "right", fontSize: 10, color: isIncome ? "#166534" : "#991b1b" }]}>
                         {isIncome ? "+" : "-"}{formatAmount(tx.amount)}
@@ -342,7 +343,7 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
             {/* FOOTER */}
             <View style={styles.footer}>
               <Text style={styles.footerText}>
-                Generated by LEDGER — offline · private · yours
+                {t("report.generated_by")}
               </Text>
             </View>
           </ScrollView>
@@ -351,11 +352,11 @@ export function ReportCard({ visible, onClose }: { visible: boolean; onClose: ()
           <View style={styles.actions}>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
               <Feather name="x" size={14} color="#374151" />
-              <Text style={styles.closeBtnText}>CLOSE</Text>
+              <Text style={styles.closeBtnText}>{t("analytics.close")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.printBtn} onPress={handlePrint}>
               <Feather name="printer" size={14} color="#1a1a2e" />
-              <Text style={styles.printBtnText}>PRINT / SAVE PDF</Text>
+              <Text style={styles.printBtnText}>{t("report.print_save_pdf")}</Text>
             </TouchableOpacity>
           </View>
         </View>
