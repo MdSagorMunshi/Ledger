@@ -57,6 +57,14 @@ type FinanceActionTarget =
   | { kind: "owe"; entry: OweEntry }
   | { kind: "lend"; entry: LendEntry };
 
+type MoneySourceValue = "spendable" | "savings" | `asset:${string}`;
+
+type MoneySourceOption = {
+  value: MoneySourceValue;
+  label: string;
+  available: number;
+};
+
 export default function FinancesScreen() {
   const {
     transactions,
@@ -107,13 +115,48 @@ export default function FinancesScreen() {
     [savingsTransactions]
   );
 
+  const manualAssets = useMemo(
+    () => assetEntries.filter((a) => a.isManual && a.type === "asset"),
+    [assetEntries]
+  );
+  const manualLiabs = useMemo(
+    () => assetEntries.filter((a) => a.isManual && a.type === "liability"),
+    [assetEntries]
+  );
+
+  const moneySourceOptions = useMemo<MoneySourceOption[]>(
+    () => [
+      {
+        value: "spendable",
+        label: t("finances.source_spendable"),
+        available: nw.spendableBalance,
+      },
+      {
+        value: "savings",
+        label: t("finances.source_savings"),
+        available: savingsPool,
+      },
+      ...manualAssets.map((asset) => ({
+        value: `asset:${asset.id}` as const,
+        label: asset.label,
+        available: asset.value,
+      })),
+    ],
+    [manualAssets, nw.spendableBalance, savingsPool, t]
+  );
+
   const [assetsExpanded, setAssetsExpanded] = useState(true);
   const [liabsExpanded, setLiabsExpanded] = useState(true);
   const [showAddAsset, setShowAddAsset] = useState(false);
+  const [showAssetWithdraw, setShowAssetWithdraw] = useState(false);
   const [editingAsset, setEditingAsset] = useState<string | null>(null);
   const [assetLabel, setAssetLabel] = useState("");
   const [assetValue, setAssetValue] = useState("");
   const [assetType, setAssetType] = useState<"asset" | "liability">("asset");
+  const [assetWithdrawSource, setAssetWithdrawSource] = useState<MoneySourceValue | null>(null);
+  const [assetWithdrawAmount, setAssetWithdrawAmount] = useState("");
+  const [assetWithdrawNote, setAssetWithdrawNote] = useState("");
+  const [assetWithdrawDate, setAssetWithdrawDate] = useState(todayStr());
 
   const [showTransferIn, setShowTransferIn] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -137,6 +180,7 @@ export default function FinancesScreen() {
   const [repayAmt, setRepayAmt] = useState("");
   const [repayNote, setRepayNote] = useState("");
   const [repayDate, setRepayDate] = useState(todayStr());
+  const [repaySource, setRepaySource] = useState<MoneySourceValue>("spendable");
   const [settledExpanded, setSettledExpanded] = useState(false);
   const [actionTarget, setActionTarget] = useState<FinanceActionTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FinanceActionTarget | null>(null);
@@ -153,11 +197,104 @@ export default function FinancesScreen() {
   const [lendRepayNote, setLendRepayNote] = useState("");
   const [lendRepayDate, setLendRepayDate] = useState(todayStr());
   const [lendSettledExpanded, setLendSettledExpanded] = useState(false);
+  const [repayingLiabilityId, setRepayingLiabilityId] = useState<string | null>(null);
+  const [liabilityRepayAmount, setLiabilityRepayAmount] = useState("");
+  const [liabilityRepayNote, setLiabilityRepayNote] = useState("");
+  const [liabilityRepayDate, setLiabilityRepayDate] = useState(todayStr());
+  const [liabilityRepaySource, setLiabilityRepaySource] = useState<MoneySourceValue>("spendable");
 
   const today = todayStr();
 
   const nwColor =
     nw.total > 0 ? C.creditGreen : nw.total < 0 ? C.debitRed : C.cipherWhite;
+
+  const getAssetSourceByValue = (source: MoneySourceValue | null) => {
+    if (!source || !source.startsWith("asset:")) return null;
+    return manualAssets.find((asset) => asset.id === source.slice(6)) ?? null;
+  };
+
+  const getSourceAvailable = (source: MoneySourceValue | null) => {
+    if (!source) return 0;
+    if (source === "spendable") return nw.spendableBalance;
+    if (source === "savings") return savingsPool;
+    return getAssetSourceByValue(source)?.value ?? 0;
+  };
+
+  const getSourceLabel = (source: MoneySourceValue | null) =>
+    moneySourceOptions.find((option) => option.value === source)?.label ?? "";
+
+  const applyFundingSource = ({
+    source,
+    amount,
+    date,
+    note,
+  }: {
+    source: MoneySourceValue;
+    amount: number;
+    date: string;
+    note: string;
+  }) => {
+    if (source === "spendable") {
+      return amount <= nw.spendableBalance;
+    }
+
+    if (source === "savings") {
+      if (amount > savingsPool) return false;
+      const ledgerId = addTransaction({
+        type: "income",
+        amount,
+        category: "Savings",
+        note: note || t("finances.withdraw_from_savings"),
+        date,
+        subtype: "savings_withdrawal",
+      });
+      addSavingsTransaction({
+        direction: "out",
+        amount,
+        goalId: null,
+        note,
+        date,
+        linkedLedgerTxId: ledgerId,
+      });
+      return true;
+    }
+
+    const asset = getAssetSourceByValue(source);
+    if (!asset || amount > asset.value) return false;
+    updateAssetEntry(asset.id, { value: asset.value - amount });
+    addTransaction({
+      type: "income",
+      amount,
+      category: "Other",
+      note: note || t("finances.withdraw_from_asset_named", { asset: asset.label }),
+      date,
+      subtype: "asset_withdrawal",
+    });
+    return true;
+  };
+
+  const resetAssetWithdrawForm = () => {
+    setAssetWithdrawSource(null);
+    setAssetWithdrawAmount("");
+    setAssetWithdrawNote("");
+    setAssetWithdrawDate(todayStr());
+  };
+
+  const openAssetWithdraw = (assetId?: string) => {
+    setAssetWithdrawSource(assetId ? (`asset:${assetId}` as const) : manualAssets[0] ? (`asset:${manualAssets[0].id}` as const) : null);
+    setAssetWithdrawAmount("");
+    setAssetWithdrawNote("");
+    setAssetWithdrawDate(todayStr());
+    setShowAssetWithdraw(true);
+  };
+
+  const resetLiabilityRepayForm = () => {
+    setRepayingLiabilityId(null);
+    setLiabilityRepayAmount("");
+    setLiabilityRepayNote("");
+    setLiabilityRepayDate(todayStr());
+    setLiabilityRepaySource("spendable");
+  };
 
   const handleAddAsset = () => {
     const v = parseFloat(assetValue);
@@ -199,7 +336,7 @@ export default function FinancesScreen() {
 
   const handleWithdraw = () => {
     const amt = parseFloat(savAmount);
-    if (isNaN(amt) || amt <= 0) return;
+    if (isNaN(amt) || amt <= 0 || amt > savingsPool) return;
     const ledgerId = addTransaction({
       type: "income",
       amount: amt,
@@ -218,6 +355,26 @@ export default function FinancesScreen() {
     });
     setSavAmount(""); setSavNote(""); setSavGoalId(null); setSavDate(todayStr());
     setShowWithdraw(false);
+  };
+
+  const handleAssetWithdraw = () => {
+    const amt = parseFloat(assetWithdrawAmount);
+    if (isNaN(amt) || amt <= 0 || !assetWithdrawSource) return;
+
+    const asset = getAssetSourceByValue(assetWithdrawSource);
+    if (!asset || amt > asset.value) return;
+
+    updateAssetEntry(asset.id, { value: asset.value - amt });
+    addTransaction({
+      type: "income",
+      amount: amt,
+      category: "Other",
+      note: assetWithdrawNote || t("finances.withdraw_from_asset_named", { asset: asset.label }),
+      date: assetWithdrawDate,
+      subtype: "asset_withdrawal",
+    });
+    resetAssetWithdrawForm();
+    setShowAssetWithdraw(false);
   };
 
   const handleAddGoal = () => {
@@ -356,7 +513,14 @@ export default function FinancesScreen() {
 
   const handleRepayOwe = (owe: OweEntry) => {
     const amt = parseFloat(repayAmt);
-    if (isNaN(amt) || amt <= 0) return;
+    if (isNaN(amt) || amt <= 0 || amt > owe.remainingAmount) return;
+    const funded = applyFundingSource({
+      source: repaySource,
+      amount: amt,
+      date: repayDate,
+      note: repayNote,
+    });
+    if (!funded) return;
     const ledgerId = addTransaction({
       type: "expense",
       amount: amt,
@@ -366,7 +530,7 @@ export default function FinancesScreen() {
       subtype: "debt_repayment",
     });
     repayOweEntry(owe.id, { amount: amt, date: repayDate, ledgerTxId: ledgerId });
-    setRepayingOweId(null); setRepayAmt(""); setRepayNote(""); setRepayDate(todayStr());
+    setRepayingOweId(null); setRepayAmt(""); setRepayNote(""); setRepayDate(todayStr()); setRepaySource("spendable");
   };
 
   const handleAddLend = () => {
@@ -403,7 +567,7 @@ export default function FinancesScreen() {
 
   const handleRepayLend = (lend: LendEntry) => {
     const amt = parseFloat(lendRepayAmt);
-    if (isNaN(amt) || amt <= 0) return;
+    if (isNaN(amt) || amt <= 0 || amt > lend.remainingAmount) return;
     const ledgerId = addTransaction({
       type: "income",
       amount: amt,
@@ -414,6 +578,31 @@ export default function FinancesScreen() {
     });
     repayLendEntry(lend.id, { amount: amt, date: lendRepayDate, ledgerTxId: ledgerId });
     setRepayingLendId(null); setLendRepayAmt(""); setLendRepayNote(""); setLendRepayDate(todayStr());
+  };
+
+  const handleRepayLiability = (liabilityId: string) => {
+    const liability = manualLiabs.find((entry) => entry.id === liabilityId);
+    const amt = parseFloat(liabilityRepayAmount);
+    if (!liability || isNaN(amt) || amt <= 0 || amt > liability.value) return;
+
+    const funded = applyFundingSource({
+      source: liabilityRepaySource,
+      amount: amt,
+      date: liabilityRepayDate,
+      note: liabilityRepayNote,
+    });
+    if (!funded) return;
+
+    addTransaction({
+      type: "expense",
+      amount: amt,
+      category: "Debt Repayment",
+      note: liabilityRepayNote || `${t("finances.record_repayment")} ${liability.label}`,
+      date: liabilityRepayDate,
+      subtype: "debt_repayment",
+    });
+    updateAssetEntry(liability.id, { value: Math.max(0, liability.value - amt) });
+    resetLiabilityRepayForm();
   };
 
   const activeOwe = oweEntries.filter((o) => o.status !== "settled");
@@ -446,9 +635,10 @@ export default function FinancesScreen() {
       ? t("finances.choose_debt_action")
       : t("finances.choose_lend_action")
     : "";
-
-  const manualAssets = assetEntries.filter((a) => a.isManual && a.type === "asset");
-  const manualLiabs = assetEntries.filter((a) => a.isManual && a.type === "liability");
+  const currentRepayingLiability =
+    repayingLiabilityId !== null
+      ? manualLiabs.find((entry) => entry.id === repayingLiabilityId) ?? null
+      : null;
 
   return (
     <ScrollView
@@ -481,8 +671,20 @@ export default function FinancesScreen() {
         </TouchableOpacity>
         {assetsExpanded && (
           <View style={styles.assetList}>
-            <AssetRow label="Spendable Balance" value={nw.spendableBalance} isAuto C={C} formatAmount={formatAmount} />
-            <AssetRow label="Savings Pool" value={nw.savingsPool} isAuto C={C} formatAmount={formatAmount} />
+            <AssetRow
+              label={t("finances.spendable_balance")}
+              value={nw.spendableBalance}
+              isAuto
+              C={C}
+              formatAmount={formatAmount}
+            />
+            <AssetRow
+              label={t("finances.savings_pool")}
+              value={nw.savingsPool}
+              isAuto
+              C={C}
+              formatAmount={formatAmount}
+            />
             {activeLend.filter(l => l.countInNetWorth).map((l) => (
               <AssetRow key={l.id} label={`Lend: ${l.personName}`} value={l.remainingAmount} isAuto C={C} formatAmount={formatAmount} />
             ))}
@@ -501,6 +703,8 @@ export default function FinancesScreen() {
                   setShowAddAsset(true);
                 }}
                 onDelete={() => deleteAssetEntry(a.id)}
+                onAction={() => openAssetWithdraw(a.id)}
+                actionIcon="corner-down-left"
               />
             ))}
           </View>
@@ -534,6 +738,14 @@ export default function FinancesScreen() {
                   setShowAddAsset(true);
                 }}
                 onDelete={() => deleteAssetEntry(a.id)}
+                onAction={() => {
+                  setRepayingLiabilityId(a.id);
+                  setLiabilityRepayAmount(String(a.value));
+                  setLiabilityRepayNote("");
+                  setLiabilityRepayDate(todayStr());
+                  setLiabilityRepaySource("spendable");
+                }}
+                actionIcon="credit-card"
               />
             ))}
             {nw.totalLiabilities === 0 && (
@@ -550,6 +762,23 @@ export default function FinancesScreen() {
       >
         <Feather name="plus" size={14} color={C.amberSignal} />
         <Text style={[styles.addAssetBtnText, { color: C.amberSignal }]}>{t("finances.add_asset_liability")}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.addAssetBtn,
+          {
+            borderColor: manualAssets.length > 0 ? C.creditGreen : C.wireGray,
+            backgroundColor: manualAssets.length > 0 ? `${C.creditGreen}12` : `${C.wireGray}18`,
+            opacity: manualAssets.length > 0 ? 1 : 0.55,
+          },
+        ]}
+        onPress={() => openAssetWithdraw()}
+        disabled={manualAssets.length === 0}
+      >
+        <Feather name="corner-down-left" size={14} color={manualAssets.length > 0 ? C.creditGreen : C.slateText} />
+        <Text style={[styles.addAssetBtnText, { color: manualAssets.length > 0 ? C.creditGreen : C.slateText }]}>
+          {t("finances.withdraw_asset")}
+        </Text>
       </TouchableOpacity>
 
       {/* SAVINGS SECTION */}
@@ -568,8 +797,16 @@ export default function FinancesScreen() {
             <Text style={[styles.savingsBtnText, { color: C.creditGreen }]}>{t("finances.transfer_in")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.savingsBtn, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]}
+            style={[
+              styles.savingsBtn,
+              {
+                borderColor: C.debitRed,
+                backgroundColor: `${C.debitRed}15`,
+                opacity: savingsPool > 0 ? 1 : 0.45,
+              },
+            ]}
             onPress={() => setShowWithdraw(true)}
+            disabled={savingsPool <= 0}
           >
             <Feather name="arrow-down" size={12} color={C.debitRed} />
             <Text style={[styles.savingsBtnText, { color: C.debitRed }]}>{t("finances.withdraw")}</Text>
@@ -678,6 +915,12 @@ export default function FinancesScreen() {
               </View>
               {repayingOweId === owe.id ? (
                 <View style={styles.repayForm}>
+                  <Text style={[styles.inlineMeta, { color: C.ghostText }]}>
+                    {t("finances.available_from", {
+                      source: getSourceLabel(repaySource),
+                      amount: formatAmount(getSourceAvailable(repaySource)),
+                    })}
+                  </Text>
                   <TextInput
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
                     value={repayAmt}
@@ -685,6 +928,14 @@ export default function FinancesScreen() {
                     placeholder={t("finances.amount_max_placeholder", { amount: formatAmount(owe.remainingAmount) })}
                     placeholderTextColor={C.ghostText}
                     keyboardType="decimal-pad"
+                  />
+                  <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.source")}</Text>
+                  <SourceSelector
+                    options={moneySourceOptions}
+                    selected={repaySource}
+                    onSelect={setRepaySource}
+                    C={C}
+                    formatAmount={formatAmount}
                   />
                   <TextInput
                     style={[styles.repayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.inkSurface }]}
@@ -702,9 +953,15 @@ export default function FinancesScreen() {
                   />
                   <View style={styles.repayBtns}>
                     <TouchableOpacity
-                    style={[styles.repayBtn, { borderColor: C.wireGray }]}
-                    onPress={() => setRepayingOweId(null)}
-                  >
+                      style={[styles.repayBtn, { borderColor: C.wireGray }]}
+                      onPress={() => {
+                        setRepayingOweId(null);
+                        setRepayAmt("");
+                        setRepayNote("");
+                        setRepayDate(todayStr());
+                        setRepaySource("spendable");
+                      }}
+                    >
                       <Text style={[styles.repayBtnText, { color: C.slateText }]}>{t("common.cancel")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -723,6 +980,7 @@ export default function FinancesScreen() {
                     setRepayAmt(String(owe.remainingAmount));
                     setRepayDate(todayStr());
                     setRepayNote("");
+                    setRepaySource("spendable");
                   }}
                 >
                   <Text style={[styles.repayTriggerText, { color: C.debitRed }]}>{t("finances.repay")}</Text>
@@ -1010,6 +1268,9 @@ export default function FinancesScreen() {
       </SimpleOverlay>
 
       <SimpleOverlay visible={showWithdraw} onClose={() => setShowWithdraw(false)} C={C} title={t("finances.withdraw")}>
+        <Text style={[styles.inlineMeta, { color: C.ghostText }]}>
+          {t("finances.available_balance", { amount: formatAmount(savingsPool) })}
+        </Text>
         <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
         <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savAmount} onChangeText={setSavAmount} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
         <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.from_goal_optional")}</Text>
@@ -1020,6 +1281,62 @@ export default function FinancesScreen() {
         <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={savDate} onChangeText={setSavDate} placeholder={t("finances.date_placeholder")} placeholderTextColor={C.ghostText} />
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]} onPress={handleWithdraw}>
           <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>{t("finances.withdraw")}</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
+
+      <SimpleOverlay
+        visible={showAssetWithdraw}
+        onClose={() => {
+          setShowAssetWithdraw(false);
+          resetAssetWithdrawForm();
+        }}
+        C={C}
+        title={t("finances.withdraw_asset")}
+      >
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.source_asset")}</Text>
+        <SourceSelector
+          options={moneySourceOptions.filter((option) => option.value.startsWith("asset:"))}
+          selected={assetWithdrawSource}
+          onSelect={(value) => setAssetWithdrawSource(value)}
+          C={C}
+          formatAmount={formatAmount}
+        />
+        <Text style={[styles.inlineMeta, { color: C.ghostText }]}>
+          {t("finances.available_from", {
+            source: getSourceLabel(assetWithdrawSource),
+            amount: formatAmount(getSourceAvailable(assetWithdrawSource)),
+          })}
+        </Text>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
+        <TextInput
+          style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
+          value={assetWithdrawAmount}
+          onChangeText={setAssetWithdrawAmount}
+          placeholder={t("finances.amount_placeholder")}
+          placeholderTextColor={C.ghostText}
+          keyboardType="decimal-pad"
+        />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.note_optional")}</Text>
+        <TextInput
+          style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
+          value={assetWithdrawNote}
+          onChangeText={setAssetWithdrawNote}
+          placeholder={t("finances.note_placeholder")}
+          placeholderTextColor={C.ghostText}
+        />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.date")}</Text>
+        <TextInput
+          style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
+          value={assetWithdrawDate}
+          onChangeText={setAssetWithdrawDate}
+          placeholder={t("finances.date_placeholder")}
+          placeholderTextColor={C.ghostText}
+        />
+        <TouchableOpacity
+          style={[styles.overlaySubmit, { borderColor: C.creditGreen, backgroundColor: `${C.creditGreen}15` }]}
+          onPress={handleAssetWithdraw}
+        >
+          <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>{t("finances.withdraw_asset")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
@@ -1082,6 +1399,70 @@ export default function FinancesScreen() {
           <Text style={[styles.overlaySubmitText, { color: C.creditGreen }]}>{editingLendId ? t("finances.update_lend_entry") : t("finances.add_lend_entry")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
+
+      <SimpleOverlay
+        visible={currentRepayingLiability !== null}
+        onClose={resetLiabilityRepayForm}
+        C={C}
+        title={
+          currentRepayingLiability
+            ? t("finances.repay_liability_title", { name: currentRepayingLiability.label })
+            : t("finances.repay_liability")
+        }
+      >
+        <Text style={[styles.inlineMeta, { color: C.ghostText }]}>
+          {currentRepayingLiability
+            ? t("finances.available_from", {
+                source: getSourceLabel(liabilityRepaySource),
+                amount: formatAmount(getSourceAvailable(liabilityRepaySource)),
+              })
+            : ""}
+        </Text>
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.amount")}</Text>
+        <TextInput
+          style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
+          value={liabilityRepayAmount}
+          onChangeText={setLiabilityRepayAmount}
+          placeholder={t("finances.amount_max_placeholder", {
+            amount: formatAmount(currentRepayingLiability?.value ?? 0),
+          })}
+          placeholderTextColor={C.ghostText}
+          keyboardType="decimal-pad"
+        />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.source")}</Text>
+        <SourceSelector
+          options={moneySourceOptions}
+          selected={liabilityRepaySource}
+          onSelect={setLiabilityRepaySource}
+          C={C}
+          formatAmount={formatAmount}
+        />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.note_optional")}</Text>
+        <TextInput
+          style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
+          value={liabilityRepayNote}
+          onChangeText={setLiabilityRepayNote}
+          placeholder={t("finances.note_placeholder")}
+          placeholderTextColor={C.ghostText}
+        />
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.date")}</Text>
+        <TextInput
+          style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]}
+          value={liabilityRepayDate}
+          onChangeText={setLiabilityRepayDate}
+          placeholder={t("finances.date_placeholder")}
+          placeholderTextColor={C.ghostText}
+        />
+        <TouchableOpacity
+          style={[styles.overlaySubmit, { borderColor: C.debitRed, backgroundColor: `${C.debitRed}15` }]}
+          onPress={() => {
+            if (!repayingLiabilityId) return;
+            handleRepayLiability(repayingLiabilityId);
+          }}
+        >
+          <Text style={[styles.overlaySubmitText, { color: C.debitRed }]}>{t("finances.record_repayment")}</Text>
+        </TouchableOpacity>
+      </SimpleOverlay>
     </ScrollView>
   );
 }
@@ -1095,6 +1476,8 @@ function AssetRow({
   color,
   onEdit,
   onDelete,
+  onAction,
+  actionIcon,
 }: {
   label: string;
   value: number;
@@ -1104,6 +1487,8 @@ function AssetRow({
   color?: string;
   onEdit?: () => void;
   onDelete?: () => void;
+  onAction?: () => void;
+  actionIcon?: keyof typeof Feather.glyphMap;
 }) {
   return (
     <View style={styles.assetRow}>
@@ -1116,6 +1501,11 @@ function AssetRow({
         )}
       </View>
       <Text style={[styles.assetValue, { color: color ?? C.creditGreen }]}>{formatAmount(value)}</Text>
+      {!isAuto && onAction && actionIcon && (
+        <TouchableOpacity onPress={onAction} style={{ marginLeft: 8 }}>
+          <Feather name={actionIcon} size={12} color={C.ghostText} />
+        </TouchableOpacity>
+      )}
       {!isAuto && onEdit && (
         <TouchableOpacity onPress={onEdit} style={{ marginLeft: 8 }}>
           <Feather name="edit-2" size={12} color={C.ghostText} />
@@ -1130,6 +1520,50 @@ function AssetRow({
   );
 }
 
+function SourceSelector({
+  options,
+  selected,
+  onSelect,
+  C,
+  formatAmount,
+}: {
+  options: MoneySourceOption[];
+  selected: MoneySourceValue | null;
+  onSelect: (value: MoneySourceValue) => void;
+  C: ReturnType<typeof getThemeColors>;
+  formatAmount: (n: number) => string;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+      <View style={{ flexDirection: "row", gap: 6 }}>
+        {options.map((option) => {
+          const active = selected === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.goalChip,
+                {
+                  borderColor: active ? C.amberSignal : C.wireGray,
+                  backgroundColor: active ? `${C.amberSignal}15` : "transparent",
+                },
+              ]}
+              onPress={() => onSelect(option.value)}
+            >
+              <Text style={[styles.goalChipText, { color: active ? C.amberSignal : C.slateText }]}>
+                {option.label}
+              </Text>
+              <Text style={[styles.sourceAmountText, { color: active ? C.cipherWhite : C.ghostText }]}>
+                {formatAmount(option.available)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
 function GoalSelector({
   goals,
   selected,
@@ -1141,6 +1575,7 @@ function GoalSelector({
   onSelect: (id: string | null) => void;
   C: ReturnType<typeof getThemeColors>;
 }) {
+  const { t } = useI18n();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
       <View style={{ flexDirection: "row", gap: 6 }}>
@@ -1148,7 +1583,9 @@ function GoalSelector({
           style={[styles.goalChip, { borderColor: selected === null ? C.amberSignal : C.wireGray, backgroundColor: selected === null ? `${C.amberSignal}15` : "transparent" }]}
           onPress={() => onSelect(null)}
         >
-          <Text style={[styles.goalChipText, { color: selected === null ? C.amberSignal : C.slateText }]}>General Pool</Text>
+          <Text style={[styles.goalChipText, { color: selected === null ? C.amberSignal : C.slateText }]}>
+            {t("finances.general_pool")}
+          </Text>
         </TouchableOpacity>
         {goals.map((g) => (
           <TouchableOpacity
@@ -1574,6 +2011,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   repayForm: { gap: 8 },
+  inlineMeta: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    lineHeight: 16,
+  },
   repayInput: {
     borderWidth: 1,
     borderRadius: 6,
@@ -1782,9 +2224,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 1,
     borderRadius: 6,
+    gap: 2,
   },
   goalChipText: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 12,
+  },
+  sourceAmountText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
   },
 });

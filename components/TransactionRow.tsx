@@ -27,6 +27,8 @@ function getSubtypeDisplay(
       return { iconName: "credit-card" as const, label: t("row.debt_repayment"), color: C.debitRed };
     case "lend_returned":
       return { iconName: "corner-down-left" as const, label: t("row.lend_returned"), color: C.creditGreen };
+    case "asset_withdrawal":
+      return { iconName: "briefcase" as const, label: t("row.asset_withdrawal"), color: C.slateText };
     default:
       return null;
   }

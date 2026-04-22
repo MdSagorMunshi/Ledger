@@ -69,7 +69,10 @@ export default function Dashboard() {
   const { t, tc } = useI18n();
 
   const regularTxs = transactions.filter(
-    (t) => t.subtype !== "savings_transfer" && t.subtype !== "savings_withdrawal"
+    (t) =>
+      t.subtype !== "savings_transfer" &&
+      t.subtype !== "savings_withdrawal" &&
+      t.subtype !== "asset_withdrawal"
   );
 
   const { totalIncome, totalExpense, balance } = useMemo(() => {

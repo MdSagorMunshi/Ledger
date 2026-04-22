@@ -22,7 +22,8 @@ const regularIncome = (txs: Transaction[]) =>
     (t) =>
       t.type === "income" &&
       t.subtype !== "savings_transfer" &&
-      t.subtype !== "savings_withdrawal"
+      t.subtype !== "savings_withdrawal" &&
+      t.subtype !== "asset_withdrawal"
   );
 
 export interface SpendingVelocityResult {

@@ -27,13 +27,9 @@ export function computeNetWorth(state: {
 }): NetWorthResult {
   const { transactions, savingsTransactions, assetEntries, oweEntries, lendEntries } = state;
 
-  const regularTxs = transactions.filter(
-    (t) => t.subtype !== "savings_transfer" && t.subtype !== "savings_withdrawal"
-  );
-
   const spendableBalance =
-    regularTxs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0) -
-    regularTxs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0) -
+    transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
   const savingsPool =
     savingsTransactions.filter((s) => s.direction === "in").reduce((sum, s) => sum + s.amount, 0) -

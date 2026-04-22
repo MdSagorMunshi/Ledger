@@ -74,7 +74,12 @@ export interface Transaction {
   note: string;
   date: string;
   time?: string;
-  subtype?: "savings_transfer" | "savings_withdrawal" | "debt_repayment" | "lend_returned";
+  subtype?:
+    | "savings_transfer"
+    | "savings_withdrawal"
+    | "debt_repayment"
+    | "lend_returned"
+    | "asset_withdrawal";
   recurringTemplateId?: string;
 }
 
