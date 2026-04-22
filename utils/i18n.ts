@@ -11,9 +11,6 @@ export const SUPPORTED_LANGUAGES: {
   { code: "hi", nativeName: "हिन्दी", englishName: "Hindi" },
   { code: "es", nativeName: "Español", englishName: "Spanish" },
   { code: "ja", nativeName: "日本語", englishName: "Japanese" },
-  { code: "fr", nativeName: "Français", englishName: "French" },
-  { code: "de", nativeName: "Deutsch", englishName: "German" },
-  { code: "ar", nativeName: "العربية", englishName: "Arabic" },
 ];
 
 export const LANGUAGE_TO_LOCALE: Record<AppLanguage, string> = {
@@ -272,6 +269,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "about.changelog_300_3": "Added visible remove controls on debt and lending cards with confirmation before deletion.",
     "about.changelog_300_4": "Deleting a debt or lending entry now also removes its linked repayment history to keep records clean.",
     "about.changelog_300_5": "Updated the About page changelog so only the current release stays expanded by default.",
+    "about.changelog_300_6": "Finance form popups now move above the keyboard automatically so inputs stay visible while typing.",
     "about.changelog_200_1": "Fixed Android export and share failures caused by an Expo module version mismatch.",
     "about.changelog_200_2": "Fixed biometric unlock so the lock screen prompts immediately when biometrics are enabled.",
     "about.changelog_200_3": "Fixed the Analytics screen crash by replacing the broken sparkline renderer.",
@@ -613,6 +611,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "about.changelog_300_3": "দেনা ও ধার কার্ডে দৃশ্যমান remove কন্ট্রোল ও ডিলিটের আগে কনফার্মেশন যোগ করা হয়েছে।",
     "about.changelog_300_4": "দেনা বা ধার এন্ট্রি মুছলে সম্পর্কিত repayment history-ও মুছে যায় যাতে রেকর্ড পরিষ্কার থাকে।",
     "about.changelog_300_5": "About পেজে শুধু বর্তমান রিলিজের changelog ডিফল্টভাবে খোলা থাকে।",
+    "about.changelog_300_6": "ফাইন্যান্স ফর্ম পপআপ এখন কিবোর্ডের ওপরে উঠে যায়, তাই টাইপ করার সময় ইনপুট ঢাকা পড়ে না।",
     "about.changelog_200_1": "Expo module version mismatch-এর কারণে Android export/share ব্যর্থ হওয়া ঠিক করা হয়েছে।",
     "about.changelog_200_2": "Biometric unlock ঠিক করা হয়েছে যাতে lock screen সঙ্গে সঙ্গে prompt দেখায়।",
     "about.changelog_200_3": "ভাঙা sparkline renderer বদলে Analytics screen crash ঠিক করা হয়েছে।",
@@ -954,6 +953,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "about.changelog_300_3": "कर्ज और उधार कार्ड पर दृश्य remove नियंत्रण और हटाने से पहले पुष्टि जोड़ी गई।",
     "about.changelog_300_4": "कर्ज या उधार प्रविष्टि हटाने पर उससे जुड़ा repayment history भी हट जाता है।",
     "about.changelog_300_5": "About पेज में केवल वर्तमान रिलीज़ का changelog डिफ़ॉल्ट रूप से खुला रहता है।",
+    "about.changelog_300_6": "Finance फॉर्म पॉपअप अब कीबोर्ड के ऊपर अपने आप उठते हैं, इसलिए टाइप करते समय इनपुट छिपते नहीं हैं।",
     "about.changelog_200_1": "Expo module version mismatch से होने वाली Android export/share समस्या ठीक की गई।",
     "about.changelog_200_2": "Biometric unlock ठीक किया गया ताकि lock screen तुरंत prompt दिखाए।",
     "about.changelog_200_3": "टूटी sparkline renderer बदलकर Analytics screen crash ठीक किया गया।",
@@ -1295,6 +1295,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "about.changelog_300_3": "Se añadieron controles visibles para eliminar con confirmación previa.",
     "about.changelog_300_4": "Al borrar una deuda o préstamo también se elimina su historial de pagos vinculado.",
     "about.changelog_300_5": "En Acerca de solo el changelog de la versión actual queda expandido por defecto.",
+    "about.changelog_300_6": "Los formularios emergentes de Finanzas ahora suben por encima del teclado para mantener visibles los campos al escribir.",
     "about.changelog_200_1": "Se corrigieron fallos de exportación y compartición en Android por desajuste de módulos Expo.",
     "about.changelog_200_2": "Se corrigió el desbloqueo biométrico para que la pantalla bloqueada pida acceso al instante.",
     "about.changelog_200_3": "Se corrigió el cierre de Analytics sustituyendo el renderer sparkline roto.",
@@ -1636,6 +1637,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "about.changelog_300_3": "削除前の確認付きで、カード上に見える削除操作を追加しました。",
     "about.changelog_300_4": "借金や貸付の記録を削除すると、関連する返済履歴も一緒に削除されます。",
     "about.changelog_300_5": "About 画面では現在バージョンの changelog だけが初期表示で展開されます。",
+    "about.changelog_300_6": "Finance のフォームポップアップはキーボードの上へ自動で移動し、入力欄が隠れなくなりました。",
     "about.changelog_200_1": "Expo モジュールの不一致による Android の export/share 問題を修正しました。",
     "about.changelog_200_2": "生体認証が有効な場合、ロック画面で即座に認証を求めるよう修正しました。",
     "about.changelog_200_3": "壊れていた sparkline renderer を置き換えて Analytics 画面のクラッシュを修正しました。",
@@ -1799,7 +1801,9 @@ export function getLanguageLabel(language: AppLanguage) {
 
 export function useI18n() {
   const { appSettings } = useLedger();
-  const language = appSettings.language;
+  const language = SUPPORTED_LANGUAGES.some((item) => item.code === appSettings.language)
+    ? appSettings.language
+    : "en";
 
   return useMemo(
     () => ({

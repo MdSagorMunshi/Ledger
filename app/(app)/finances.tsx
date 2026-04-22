@@ -8,6 +8,8 @@ import {
   Modal,
   TextInput,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useLedger, OweEntry, LendEntry, SavingsGoal } from "@/context/LedgerContext";
@@ -1285,7 +1287,11 @@ function SimpleOverlay({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlayBackdrop}>
+      <KeyboardAvoidingView
+        style={styles.overlayBackdrop}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 18 : 0}
+      >
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
         <View style={[styles.overlaySheet, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
           <View style={styles.overlayHeader}>
@@ -1298,7 +1304,7 @@ function SimpleOverlay({
             <View style={{ gap: 10, paddingBottom: 20 }}>{children}</View>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
