@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   Switch,
-  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useLedger, OweEntry, LendEntry, SavingsGoal } from "@/context/LedgerContext";
@@ -51,6 +50,10 @@ function ProgressBar({
     </View>
   );
 }
+
+type FinanceActionTarget =
+  | { kind: "owe"; entry: OweEntry }
+  | { kind: "lend"; entry: LendEntry };
 
 export default function FinancesScreen() {
   const {
@@ -133,6 +136,8 @@ export default function FinancesScreen() {
   const [repayNote, setRepayNote] = useState("");
   const [repayDate, setRepayDate] = useState(todayStr());
   const [settledExpanded, setSettledExpanded] = useState(false);
+  const [actionTarget, setActionTarget] = useState<FinanceActionTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FinanceActionTarget | null>(null);
 
   const [showAddLend, setShowAddLend] = useState(false);
   const [lendName, setLendName] = useState("");
@@ -265,79 +270,55 @@ export default function FinancesScreen() {
   };
 
   const confirmDeleteOwe = (owe: OweEntry) => {
-    const repaymentCount = owe.repayments.length;
-    Alert.alert(
-      t("finances.remove_debt_title"),
-      repaymentCount > 0
-        ? `This will remove ${owe.personName}'s debt and ${repaymentCount} linked repayment ${repaymentCount === 1 ? "record" : "records"}.`
-        : `This will remove ${owe.personName}'s debt entry.`,
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("finances.remove"),
-          style: "destructive",
-          onPress: () => {
-            deleteOweEntry(owe.id);
-            if (repayingOweId === owe.id) {
-              setRepayingOweId(null);
-              setRepayAmt("");
-              setRepayNote("");
-              setRepayDate(todayStr());
-            }
-          },
-        },
-      ]
-    );
+    setActionTarget(null);
+    setDeleteTarget({ kind: "owe", entry: owe });
   };
 
   const confirmDeleteLend = (lend: LendEntry) => {
-    const repaymentCount = lend.repayments.length;
-    Alert.alert(
-      t("finances.remove_lend_title"),
-      repaymentCount > 0
-        ? `This will remove ${lend.personName}'s record and ${repaymentCount} linked repayment ${repaymentCount === 1 ? "record" : "records"}.`
-        : `This will remove ${lend.personName}'s lending record.`,
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("finances.remove"),
-          style: "destructive",
-          onPress: () => {
-            deleteLendEntry(lend.id);
-            if (repayingLendId === lend.id) {
-              setRepayingLendId(null);
-              setLendRepayAmt("");
-              setLendRepayNote("");
-              setLendRepayDate(todayStr());
-            }
-          },
-        },
-      ]
-    );
+    setActionTarget(null);
+    setDeleteTarget({ kind: "lend", entry: lend });
   };
 
   const showOweActions = (owe: OweEntry) => {
-    Alert.alert(
-      owe.personName,
-      t("finances.choose_debt_action"),
-      [
-        { text: t("finances.edit"), onPress: () => openOweEditor(owe) },
-        { text: t("finances.remove"), style: "destructive", onPress: () => confirmDeleteOwe(owe) },
-        { text: t("common.cancel"), style: "cancel" },
-      ]
-    );
+    setActionTarget({ kind: "owe", entry: owe });
   };
 
   const showLendActions = (lend: LendEntry) => {
-    Alert.alert(
-      lend.personName,
-      t("finances.choose_lend_action"),
-      [
-        { text: t("finances.edit"), onPress: () => openLendEditor(lend) },
-        { text: t("finances.remove"), style: "destructive", onPress: () => confirmDeleteLend(lend) },
-        { text: t("common.cancel"), style: "cancel" },
-      ]
-    );
+    setActionTarget({ kind: "lend", entry: lend });
+  };
+
+  const handleDeleteConfirmed = () => {
+    if (!deleteTarget) return;
+
+    if (deleteTarget.kind === "owe") {
+      deleteOweEntry(deleteTarget.entry.id);
+      if (repayingOweId === deleteTarget.entry.id) {
+        setRepayingOweId(null);
+        setRepayAmt("");
+        setRepayNote("");
+        setRepayDate(todayStr());
+      }
+    } else {
+      deleteLendEntry(deleteTarget.entry.id);
+      if (repayingLendId === deleteTarget.entry.id) {
+        setRepayingLendId(null);
+        setLendRepayAmt("");
+        setLendRepayNote("");
+        setLendRepayDate(todayStr());
+      }
+    }
+
+    setDeleteTarget(null);
+  };
+
+  const handleEditFromMenu = () => {
+    if (!actionTarget) return;
+    if (actionTarget.kind === "owe") {
+      openOweEditor(actionTarget.entry);
+    } else {
+      openLendEditor(actionTarget.entry);
+    }
+    setActionTarget(null);
   };
 
   const handleAddOwe = () => {
@@ -437,6 +418,32 @@ export default function FinancesScreen() {
   const settledOwe = oweEntries.filter((o) => o.status === "settled");
   const activeLend = lendEntries.filter((l) => l.status !== "returned");
   const returnedLend = lendEntries.filter((l) => l.status === "returned");
+
+  const deleteTitle = deleteTarget
+    ? deleteTarget.kind === "owe"
+      ? t("finances.remove_debt_title")
+      : t("finances.remove_lend_title")
+    : "";
+  const deleteDescription = deleteTarget
+    ? deleteTarget.kind === "owe"
+      ? deleteTarget.entry.repayments.length > 0
+        ? t("finances.delete_debt_with_records", {
+            name: deleteTarget.entry.personName,
+            count: deleteTarget.entry.repayments.length,
+          })
+        : t("finances.delete_debt_single", { name: deleteTarget.entry.personName })
+      : deleteTarget.entry.repayments.length > 0
+      ? t("finances.delete_lend_with_records", {
+          name: deleteTarget.entry.personName,
+          count: deleteTarget.entry.repayments.length,
+        })
+      : t("finances.delete_lend_single", { name: deleteTarget.entry.personName })
+    : "";
+  const actionDescription = actionTarget
+    ? actionTarget.kind === "owe"
+      ? t("finances.choose_debt_action")
+      : t("finances.choose_lend_action")
+    : "";
 
   const manualAssets = assetEntries.filter((a) => a.isManual && a.type === "asset");
   const manualLiabs = assetEntries.filter((a) => a.isManual && a.type === "liability");
@@ -628,7 +635,7 @@ export default function FinancesScreen() {
             <TouchableOpacity
               key={owe.id}
               activeOpacity={0.95}
-              delayLongPress={1500}
+              delayLongPress={1000}
               onLongPress={() => showOweActions(owe)}
               style={[
                 styles.oweCard,
@@ -733,7 +740,7 @@ export default function FinancesScreen() {
           <TouchableOpacity
             key={owe.id}
             activeOpacity={0.95}
-            delayLongPress={1500}
+            delayLongPress={1000}
             onLongPress={() => showOweActions(owe)}
             style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}
           >
@@ -791,7 +798,7 @@ export default function FinancesScreen() {
             <TouchableOpacity
               key={lend.id}
               activeOpacity={0.95}
-              delayLongPress={1500}
+              delayLongPress={1000}
               onLongPress={() => showLendActions(lend)}
               style={[
                 styles.oweCard,
@@ -907,11 +914,11 @@ export default function FinancesScreen() {
             </Text>
           </TouchableOpacity>
         )}
-        {lendSettledExpanded && returnedLend.map((lend) => (
+      {lendSettledExpanded && returnedLend.map((lend) => (
           <TouchableOpacity
             key={lend.id}
             activeOpacity={0.95}
-            delayLongPress={1500}
+            delayLongPress={1000}
             onLongPress={() => showLendActions(lend)}
             style={[styles.oweCard, { backgroundColor: C.forgeBlack, borderColor: C.wireGray, opacity: 0.5 }]}
           >
@@ -938,6 +945,34 @@ export default function FinancesScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <FinanceActionModal
+        visible={!!actionTarget}
+        title={actionTarget?.entry.personName ?? ""}
+        description={actionDescription}
+        C={C}
+        onClose={() => setActionTarget(null)}
+        onEdit={handleEditFromMenu}
+        onRemove={() => {
+          if (!actionTarget) return;
+          if (actionTarget.kind === "owe") {
+            confirmDeleteOwe(actionTarget.entry);
+          } else {
+            confirmDeleteLend(actionTarget.entry);
+          }
+        }}
+        t={t}
+      />
+
+      <FinanceConfirmModal
+        visible={!!deleteTarget}
+        title={deleteTitle}
+        description={deleteDescription}
+        C={C}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirmed}
+        t={t}
+      />
 
       {/* OVERLAYS */}
       <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); setEditingAsset(null); }} C={C} title={editingAsset ? `${t("finances.edit")} ${t("finances.type")}` : t("finances.add_asset_liability")}>
@@ -1124,6 +1159,114 @@ function GoalSelector({
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+function FinanceActionModal({
+  visible,
+  title,
+  description,
+  C,
+  onClose,
+  onEdit,
+  onRemove,
+  t,
+}: {
+  visible: boolean;
+  title: string;
+  description: string;
+  C: ReturnType<typeof getThemeColors>;
+  onClose: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.dialogBackdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+        <View style={[styles.dialogCard, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+          <View style={styles.dialogHeader}>
+            <View style={[styles.dialogIcon, { backgroundColor: `${C.amberSignal}16`, borderColor: `${C.amberSignal}50` }]}>
+              <Feather name="more-horizontal" size={16} color={C.amberSignal} />
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Feather name="x" size={16} color={C.slateText} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.dialogTitle, { color: C.cipherWhite }]}>{title}</Text>
+          <Text style={[styles.dialogText, { color: C.slateText }]}>{description}</Text>
+          <View style={styles.dialogActionStack}>
+            <TouchableOpacity
+              style={[styles.dialogOptionBtn, { borderColor: C.wireGray, backgroundColor: C.inkSurface }]}
+              onPress={onEdit}
+            >
+              <Feather name="edit-2" size={14} color={C.amberSignal} />
+              <Text style={[styles.dialogOptionText, { color: C.cipherWhite }]}>{t("finances.edit")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dialogOptionBtn, { borderColor: `${C.debitRed}55`, backgroundColor: `${C.debitRed}10` }]}
+              onPress={onRemove}
+            >
+              <Feather name="trash-2" size={14} color={C.debitRed} />
+              <Text style={[styles.dialogOptionText, { color: C.debitRed }]}>{t("finances.remove")}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[styles.dialogCancelBtn, { borderColor: C.wireGray }]} onPress={onClose}>
+            <Text style={[styles.dialogCancelText, { color: C.slateText }]}>{t("common.cancel")}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function FinanceConfirmModal({
+  visible,
+  title,
+  description,
+  C,
+  onClose,
+  onConfirm,
+  t,
+}: {
+  visible: boolean;
+  title: string;
+  description: string;
+  C: ReturnType<typeof getThemeColors>;
+  onClose: () => void;
+  onConfirm: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.dialogBackdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+        <View style={[styles.dialogCard, { backgroundColor: C.vaultDark, borderColor: `${C.debitRed}55` }]}>
+          <View style={styles.dialogHeader}>
+            <View style={[styles.dialogIcon, { backgroundColor: `${C.debitRed}16`, borderColor: `${C.debitRed}55` }]}>
+              <Feather name="alert-triangle" size={16} color={C.debitRed} />
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Feather name="x" size={16} color={C.slateText} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.dialogTitle, { color: C.cipherWhite }]}>{title}</Text>
+          <Text style={[styles.dialogText, { color: C.slateText }]}>{description}</Text>
+          <View style={styles.dialogFooter}>
+            <TouchableOpacity style={[styles.dialogHalfBtn, { borderColor: C.wireGray }]} onPress={onClose}>
+              <Text style={[styles.dialogCancelText, { color: C.slateText }]}>{t("common.cancel")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dialogHalfBtn, { borderColor: `${C.debitRed}55`, backgroundColor: `${C.debitRed}10` }]}
+              onPress={onConfirm}
+            >
+              <Text style={[styles.dialogDangerText, { color: C.debitRed }]}>{t("finances.remove")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1485,6 +1628,85 @@ const styles = StyleSheet.create({
     fontFamily: "SyneMono_400Regular",
     fontSize: 8,
     letterSpacing: 0.5,
+  },
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(7,9,14,0.84)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  dialogCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 18,
+    gap: 14,
+  },
+  dialogHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dialogIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialogTitle: {
+    fontFamily: "Syne_700Bold",
+    fontSize: 16,
+    letterSpacing: 0.8,
+  },
+  dialogText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    lineHeight: 18,
+  },
+  dialogActionStack: {
+    gap: 8,
+  },
+  dialogOptionBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  dialogOptionText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  dialogCancelBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  dialogCancelText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  dialogFooter: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  dialogHalfBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  dialogDangerText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
   },
   overlayBackdrop: {
     flex: 1,
