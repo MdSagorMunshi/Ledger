@@ -140,6 +140,7 @@ export default function AppLayout() {
     recurringTemplates,
     currency,
     autoBackupEnabled,
+    autoBackupEncrypted,
     autoBackupFolderUri,
     autoBackupPassword,
     pin,
@@ -175,8 +176,8 @@ export default function AppLayout() {
     if (Platform.OS === "web") return;
     if (backupTimer.current) clearTimeout(backupTimer.current);
     backupTimer.current = setTimeout(async () => {
-      const password = autoBackupPassword ?? pin ?? "";
-      if (!password) return;
+      const password = autoBackupEncrypted ? autoBackupPassword ?? pin ?? "" : "";
+      if (autoBackupEncrypted && !password) return;
       const result = await performAutoBackup(
         {
           transactions,
@@ -191,7 +192,8 @@ export default function AppLayout() {
           currency,
         },
         password,
-        autoBackupFolderUri
+        autoBackupFolderUri,
+        autoBackupEncrypted
       );
       if (result.ok) {
         recordBackupResult(result.time, result.path);
@@ -212,6 +214,7 @@ export default function AppLayout() {
     appSettings,
     currency,
     autoBackupEnabled,
+    autoBackupEncrypted,
     autoBackupFolderUri,
     autoBackupPassword,
     isUnlocked,

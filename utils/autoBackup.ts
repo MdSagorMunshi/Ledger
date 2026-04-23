@@ -73,7 +73,8 @@ async function nextIndex(dir: string, FileSystem: any): Promise<number> {
 export async function performAutoBackup(
   fullState: Record<string, any>,
   password: string,
-  folderUri: string | null
+  folderUri: string | null,
+  encrypted: boolean
 ): Promise<BackupResult> {
   if (Platform.OS === "web") {
     return { ok: false, reason: "web-unsupported" };
@@ -84,11 +85,14 @@ export async function performAutoBackup(
   }
 
   try {
-    const payload = await encryptData(
-      { ...fullState, exportedAt: new Date().toISOString(), version: 1 },
-      password
-    );
-    const json = JSON.stringify(payload);
+    const snapshot = {
+      ...fullState,
+      exportedAt: new Date().toISOString(),
+      version: 1,
+    };
+    const json = encrypted
+      ? JSON.stringify(await encryptData(snapshot, password))
+      : JSON.stringify(snapshot);
 
     if (Platform.OS === "android") {
       await pruneSAFDir(folderUri, FileSystem);

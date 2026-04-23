@@ -241,6 +241,7 @@ interface LedgerState {
   lastAddedId: string | null;
   biometricEnabled: boolean;
   autoBackupEnabled: boolean;
+  autoBackupEncrypted: boolean;
   autoBackupFolderUri: string | null;
   autoBackupPassword: string | null;
   lastBackupTime: string | null;
@@ -269,6 +270,7 @@ interface LedgerContextValue extends LedgerState {
   formatAmount: (amount: number) => string;
   setBiometricEnabled: (enabled: boolean) => void;
   setAutoBackupEnabled: (enabled: boolean) => void;
+  setAutoBackupEncrypted: (encrypted: boolean) => void;
   setAutoBackupFolderUri: (uri: string | null) => void;
   setAutoBackupPassword: (password: string | null) => void;
   recordBackupResult: (time: string, path: string) => void;
@@ -323,6 +325,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [autoBackupEnabled, setAutoBackupEnabledState] = useState(false);
+  const [autoBackupEncrypted, setAutoBackupEncryptedState] = useState(false);
   const [autoBackupFolderUri, setAutoBackupFolderUriState] = useState<string | null>(null);
   const [autoBackupPassword, setAutoBackupPasswordState] = useState<string | null>(null);
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null);
@@ -370,6 +373,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       currency,
       biometricEnabled,
       autoBackupEnabled,
+      autoBackupEncrypted,
       autoBackupFolderUri,
       autoBackupPassword,
       lastBackupTime,
@@ -388,6 +392,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       currency,
       biometricEnabled,
       autoBackupEnabled,
+      autoBackupEncrypted,
       autoBackupFolderUri,
       autoBackupPassword,
       lastBackupTime,
@@ -468,6 +473,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       currency: CURRENCIES[0],
       biometricEnabled: false,
       autoBackupEnabled: false,
+      autoBackupEncrypted: false,
       autoBackupFolderUri: null,
       autoBackupPassword: null,
       lastBackupTime: null,
@@ -495,6 +501,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
             if (stored.currency) setCurrencyState(stored.currency);
             if (stored.biometricEnabled !== undefined) setBiometricEnabledState(stored.biometricEnabled);
             if (stored.autoBackupEnabled !== undefined) setAutoBackupEnabledState(stored.autoBackupEnabled);
+            if (stored.autoBackupEncrypted !== undefined) setAutoBackupEncryptedState(stored.autoBackupEncrypted);
             if (stored.autoBackupFolderUri !== undefined) setAutoBackupFolderUriState(stored.autoBackupFolderUri);
             if (stored.autoBackupPassword !== undefined) setAutoBackupPasswordState(stored.autoBackupPassword);
             if (stored.lastBackupTime !== undefined) setLastBackupTime(stored.lastBackupTime);
@@ -580,6 +587,10 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
 
   const setAutoBackupEnabled = useCallback((enabled: boolean) => {
     setAutoBackupEnabledState(enabled);
+  }, []);
+
+  const setAutoBackupEncrypted = useCallback((encrypted: boolean) => {
+    setAutoBackupEncryptedState(encrypted);
   }, []);
 
   const setAutoBackupFolderUri = useCallback((uri: string | null) => {
@@ -830,6 +841,12 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     if (state.recurringTemplates) setRecurringTemplates(state.recurringTemplates);
     if (state.appSettings) setAppSettings({ ...DEFAULT_SETTINGS, ...state.appSettings });
     if (state.currency) setCurrencyState(state.currency);
+    if (state.autoBackupEnabled !== undefined) setAutoBackupEnabledState(state.autoBackupEnabled);
+    if (state.autoBackupEncrypted !== undefined) setAutoBackupEncryptedState(state.autoBackupEncrypted);
+    if (state.autoBackupFolderUri !== undefined) setAutoBackupFolderUriState(state.autoBackupFolderUri);
+    if (state.autoBackupPassword !== undefined) setAutoBackupPasswordState(state.autoBackupPassword);
+    if (state.lastBackupTime !== undefined) setLastBackupTime(state.lastBackupTime);
+    if (state.lastBackupPath !== undefined) setLastBackupPath(state.lastBackupPath);
   }, []);
 
   const resetLastActivity = useCallback(() => {
@@ -845,6 +862,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       lastAddedId,
       biometricEnabled,
       autoBackupEnabled,
+      autoBackupEncrypted,
       autoBackupFolderUri,
       autoBackupPassword,
       lastBackupTime,
@@ -869,6 +887,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       formatAmount,
       setBiometricEnabled,
       setAutoBackupEnabled,
+      setAutoBackupEncrypted,
       setAutoBackupFolderUri,
       setAutoBackupPassword,
       recordBackupResult,
@@ -907,6 +926,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       lastAddedId,
       biometricEnabled,
       autoBackupEnabled,
+      autoBackupEncrypted,
       autoBackupFolderUri,
       autoBackupPassword,
       lastBackupTime,
@@ -931,6 +951,7 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       formatAmount,
       setBiometricEnabled,
       setAutoBackupEnabled,
+      setAutoBackupEncrypted,
       setAutoBackupFolderUri,
       setAutoBackupPassword,
       recordBackupResult,

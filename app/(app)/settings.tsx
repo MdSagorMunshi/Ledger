@@ -385,7 +385,7 @@ function BackupFolderModal({
           </View>
           <Text style={[styles.modalTitle, { color: C.amberSignal }]}>SELECT BACKUP FOLDER</Text>
           <Text style={[styles.modalBody, { color: C.cipherWhite }]}>
-            Choose a folder in your file manager where encrypted `.ledger` snapshots will be stored.
+            Choose a folder in your file manager where `.ledger` auto-backup snapshots will be stored.
           </Text>
           <View style={[styles.folderPreview, { backgroundColor: C.forgeBlack, borderColor: C.wireGray }]}>
             <Text style={[styles.folderPreviewLabel, { color: C.ghostText }]}>CURRENT TARGET</Text>
@@ -449,6 +449,8 @@ export default function SettingsScreen() {
     setBiometricEnabled,
     autoBackupEnabled,
     setAutoBackupEnabled,
+    autoBackupEncrypted,
+    setAutoBackupEncrypted,
     autoBackupFolderUri,
     setAutoBackupFolderUri,
     autoBackupPassword,
@@ -511,7 +513,7 @@ export default function SettingsScreen() {
   };
 
   const runAutoBackupNow = async (folderUri: string | null) => {
-    const pw = autoBackupPassword || pin || "0000";
+    const pw = autoBackupEncrypted ? autoBackupPassword || pin || "0000" : "";
     const result = await performAutoBackup(
       {
         transactions,
@@ -526,7 +528,8 @@ export default function SettingsScreen() {
         currency,
       },
       pw,
-      folderUri
+      folderUri,
+      autoBackupEncrypted
     );
     if (result.ok) {
       recordBackupResult(result.time, result.path);
@@ -568,6 +571,13 @@ export default function SettingsScreen() {
   const handlePickFolder = () => {
     if (Platform.OS !== "android") return;
     openBackupFolderModal(false);
+  };
+
+  const handleBackupModeChange = async (encrypted: boolean) => {
+    setAutoBackupEncrypted(encrypted);
+    if (autoBackupEnabled && autoBackupFolderUri) {
+      await runAutoBackupNow(autoBackupFolderUri);
+    }
   };
 
   // Auto backup toggle: require folder selection first
@@ -636,6 +646,10 @@ export default function SettingsScreen() {
     { label: t("settings.dark"), value: "dark" },
     { label: t("settings.dim"), value: "dim" },
     { label: t("settings.oled"), value: "oled" },
+  ];
+  const backupModeOptions: { label: string; value: "plain" | "encrypted" }[] = [
+    { label: t("settings.backup_mode_plain"), value: "plain" },
+    { label: t("settings.backup_mode_encrypted"), value: "encrypted" },
   ];
 
   const lastBackupLabel = lastBackupTime
@@ -790,26 +804,60 @@ export default function SettingsScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.row, { borderTopColor: C.wireGray, borderTopWidth: 1 }]}
-          onPress={() => setShowBackupPassword(true)}
-          disabled={Platform.OS === "web"}
-        >
+        <View style={[styles.row, { borderTopColor: C.wireGray, borderTopWidth: 1, alignItems: "flex-start" }]}>
           <View style={[styles.iconBox, { backgroundColor: `${C.amberSignal}18` }]}>
             <Feather name="shield" size={14} color={Platform.OS === "web" ? C.ghostText : C.amberSignal} />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, gap: 8 }}>
             <Text style={[styles.rowLabel, { color: Platform.OS === "web" ? C.ghostText : C.cipherWhite }]}>
+              {t("settings.backup_mode")}
+            </Text>
+            <Text style={[styles.rowSub, { color: C.slateText }]}>
+              {autoBackupEncrypted ? t("settings.backup_mode_encrypted_desc") : t("settings.backup_mode_plain_desc")}
+            </Text>
+            <PillGroup
+              options={backupModeOptions}
+              value={autoBackupEncrypted ? "encrypted" : "plain"}
+              onChange={(value) => void handleBackupModeChange(value === "encrypted")}
+              C={C}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.row, { borderTopColor: C.wireGray, borderTopWidth: 1 }]}
+          onPress={() => setShowBackupPassword(true)}
+          disabled={Platform.OS === "web" || !autoBackupEncrypted}
+        >
+          <View style={[styles.iconBox, { backgroundColor: `${C.amberSignal}18` }]}>
+            <Feather
+              name="key"
+              size={14}
+              color={Platform.OS === "web" || !autoBackupEncrypted ? C.ghostText : C.amberSignal}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowLabel, { color: Platform.OS === "web" || !autoBackupEncrypted ? C.ghostText : C.cipherWhite }]}>
               {t("settings.backup_password")}
             </Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {autoBackupPassword ? t("settings.custom_password") : t("settings.using_pin")}
+              {autoBackupEncrypted
+                ? autoBackupPassword
+                  ? t("settings.custom_password")
+                  : t("settings.using_pin")
+                : t("settings.backup_password_unused")}
             </Text>
           </View>
           <View
             style={[
               styles.statusDot,
-              { backgroundColor: autoBackupPassword ? C.amberSignal : C.creditGreen },
+              {
+                backgroundColor: !autoBackupEncrypted
+                  ? C.ghostText
+                  : autoBackupPassword
+                  ? C.amberSignal
+                  : C.creditGreen,
+              },
             ]}
           />
         </TouchableOpacity>

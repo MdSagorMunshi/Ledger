@@ -33,6 +33,7 @@ type PersistedState = {
   currency: Currency;
   biometricEnabled: boolean;
   autoBackupEnabled: boolean;
+  autoBackupEncrypted: boolean;
   autoBackupFolderUri: string | null;
   autoBackupPassword: string | null;
   lastBackupTime: string | null;
@@ -43,6 +44,7 @@ type SettingsRow = {
   pin: string | null;
   biometric_enabled: number;
   auto_backup_enabled: number;
+  auto_backup_encrypted: number;
   auto_backup_folder_uri: string | null;
   auto_backup_password: string | null;
   last_backup_time: string | null;
@@ -112,6 +114,7 @@ async function initDb(): Promise<SQLiteDatabase> {
       pin TEXT,
       biometric_enabled INTEGER NOT NULL DEFAULT 0,
       auto_backup_enabled INTEGER NOT NULL DEFAULT 0,
+      auto_backup_encrypted INTEGER NOT NULL DEFAULT 0,
       auto_backup_folder_uri TEXT,
       auto_backup_password TEXT,
       last_backup_time TEXT,
@@ -238,6 +241,14 @@ async function initDb(): Promise<SQLiteDatabase> {
     // Column already exists on upgraded installs.
   }
 
+  try {
+    await db.runAsync(
+      `ALTER TABLE app_settings ADD COLUMN auto_backup_encrypted INTEGER NOT NULL DEFAULT 0`
+    );
+  } catch {
+    // Column already exists on upgraded installs.
+  }
+
   await db.runAsync(
     `INSERT OR IGNORE INTO app_settings (
       id, theme, default_currency_code, language
@@ -292,6 +303,7 @@ function hasSettingsChanges(
   return (
     previousState.biometricEnabled !== nextState.biometricEnabled ||
     previousState.autoBackupEnabled !== nextState.autoBackupEnabled ||
+    previousState.autoBackupEncrypted !== nextState.autoBackupEncrypted ||
     previousState.autoBackupFolderUri !== nextState.autoBackupFolderUri ||
     previousState.autoBackupPassword !== nextState.autoBackupPassword ||
     previousState.lastBackupTime !== nextState.lastBackupTime ||
@@ -498,6 +510,7 @@ async function loadSettingsRow(db: SQLiteDatabase): Promise<SettingsRow> {
       pin,
       biometric_enabled,
       auto_backup_enabled,
+      auto_backup_encrypted,
       auto_backup_folder_uri,
       auto_backup_password,
       last_backup_time,
@@ -516,6 +529,7 @@ async function loadSettingsRow(db: SQLiteDatabase): Promise<SettingsRow> {
       pin: null,
       biometric_enabled: 0,
       auto_backup_enabled: 0,
+      auto_backup_encrypted: 0,
       auto_backup_folder_uri: null,
       auto_backup_password: null,
       last_backup_time: null,
@@ -758,6 +772,7 @@ async function buildStateFromDb(db: SQLiteDatabase, settings: SettingsRow): Prom
     },
     biometricEnabled: toBool(settings.biometric_enabled),
     autoBackupEnabled: toBool(settings.auto_backup_enabled),
+    autoBackupEncrypted: toBool(settings.auto_backup_encrypted),
     autoBackupFolderUri: settings.auto_backup_folder_uri,
     autoBackupPassword: settings.auto_backup_password,
     lastBackupTime: settings.last_backup_time,
@@ -871,6 +886,7 @@ export async function saveVault(
            SET pin = ?,
                biometric_enabled = ?,
                auto_backup_enabled = ?,
+               auto_backup_encrypted = ?,
                auto_backup_folder_uri = ?,
                auto_backup_password = ?,
                last_backup_time = ?,
@@ -883,6 +899,7 @@ export async function saveVault(
           pin,
           toInt(state.biometricEnabled),
           toInt(state.autoBackupEnabled),
+          toInt(state.autoBackupEncrypted),
           state.autoBackupFolderUri,
           state.autoBackupPassword,
           state.lastBackupTime,
@@ -945,6 +962,7 @@ export async function deleteVault(): Promise<void> {
          SET pin = NULL,
              biometric_enabled = 0,
              auto_backup_enabled = 0,
+             auto_backup_encrypted = 0,
              auto_backup_folder_uri = NULL,
              auto_backup_password = NULL,
              last_backup_time = NULL,
