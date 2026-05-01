@@ -53,6 +53,8 @@ type SettingsRow = {
   auto_lock_minutes: number | null;
   default_currency_code: string;
   language: AppSettings["language"];
+  font_size_percent: number;
+  font_weight: AppSettings["fontWeight"];
 };
 
 type OweRepaymentRow = Omit<OweRepayment, "ledgerTxId"> & {
@@ -122,7 +124,9 @@ async function initDb(): Promise<SQLiteDatabase> {
       theme TEXT NOT NULL DEFAULT 'dark',
       auto_lock_minutes INTEGER,
       default_currency_code TEXT NOT NULL DEFAULT 'BDT',
-      language TEXT NOT NULL DEFAULT 'en'
+      language TEXT NOT NULL DEFAULT 'en',
+      font_size_percent INTEGER NOT NULL DEFAULT 0,
+      font_weight TEXT NOT NULL DEFAULT 'default'
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -244,6 +248,22 @@ async function initDb(): Promise<SQLiteDatabase> {
   try {
     await db.runAsync(
       `ALTER TABLE app_settings ADD COLUMN auto_backup_encrypted INTEGER NOT NULL DEFAULT 0`
+    );
+  } catch {
+    // Column already exists on upgraded installs.
+  }
+
+  try {
+    await db.runAsync(
+      `ALTER TABLE app_settings ADD COLUMN font_size_percent INTEGER NOT NULL DEFAULT 0`
+    );
+  } catch {
+    // Column already exists on upgraded installs.
+  }
+
+  try {
+    await db.runAsync(
+      `ALTER TABLE app_settings ADD COLUMN font_weight TEXT NOT NULL DEFAULT 'default'`
     );
   } catch {
     // Column already exists on upgraded installs.
@@ -518,7 +538,9 @@ async function loadSettingsRow(db: SQLiteDatabase): Promise<SettingsRow> {
       theme,
       auto_lock_minutes,
       default_currency_code,
-      language
+      language,
+      font_size_percent,
+      font_weight
      FROM app_settings
      WHERE id = ?`,
     SETTINGS_ROW_ID
@@ -538,6 +560,8 @@ async function loadSettingsRow(db: SQLiteDatabase): Promise<SettingsRow> {
       auto_lock_minutes: null,
       default_currency_code: DEFAULT_CURRENCY_CODE,
       language: DEFAULT_LANGUAGE,
+      font_size_percent: 0,
+      font_weight: "default",
     }
   );
 }
@@ -765,6 +789,8 @@ async function buildStateFromDb(db: SQLiteDatabase, settings: SettingsRow): Prom
       autoLockMinutes: settings.auto_lock_minutes,
       defaultCurrencyCode: settings.default_currency_code,
       language: settings.language,
+      fontSizePercent: settings.font_size_percent,
+      fontWeight: settings.font_weight,
     },
     currency: {
       code: settings.default_currency_code,
@@ -894,7 +920,9 @@ export async function saveVault(
                theme = ?,
                auto_lock_minutes = ?,
                default_currency_code = ?,
-               language = ?
+               language = ?,
+               font_size_percent = ?,
+               font_weight = ?
            WHERE id = ?`,
           pin,
           toInt(state.biometricEnabled),
@@ -908,6 +936,8 @@ export async function saveVault(
           state.appSettings.autoLockMinutes,
           state.currency.code,
           state.appSettings.language,
+          state.appSettings.fontSizePercent,
+          state.appSettings.fontWeight,
           SETTINGS_ROW_ID
         );
       }
@@ -970,7 +1000,9 @@ export async function deleteVault(): Promise<void> {
              theme = ?,
              auto_lock_minutes = NULL,
              default_currency_code = ?,
-             language = ?
+             language = ?,
+             font_size_percent = 0,
+             font_weight = 'default'
          WHERE id = ?`,
         DEFAULT_THEME,
         DEFAULT_CURRENCY_CODE,

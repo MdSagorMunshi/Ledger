@@ -14,6 +14,10 @@ import {
   saveVault,
   deleteVault,
 } from "@/utils/storage";
+import {
+  installTypographyControls,
+  setTypographyPreferences,
+} from "@/utils/typography";
 
 export type TransactionType = "income" | "expense";
 
@@ -172,6 +176,8 @@ export interface AppSettings {
   theme: "dark" | "dim" | "oled";
   defaultCurrencyCode: string;
   language: AppLanguage;
+  fontSizePercent: number;
+  fontWeight: "default" | "semibold" | "bold" | "extrabold";
 }
 
 function generateId(): string {
@@ -315,9 +321,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark",
   defaultCurrencyCode: "BDT",
   language: "en",
+  fontSizePercent: 0,
+  fontWeight: "default",
 };
 
 export function LedgerProvider({ children }: { children: React.ReactNode }) {
+  installTypographyControls();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pin, setPin] = useState<string | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -339,6 +348,10 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setTypographyPreferences(appSettings);
+  }, [appSettings]);
   const lastActivityRef = useRef<number>(Date.now());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinRef = useRef<string | null>(null);

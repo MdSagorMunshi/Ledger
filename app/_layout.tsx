@@ -2,12 +2,15 @@ import {
   JetBrainsMono_400Regular,
   JetBrainsMono_500Medium,
   JetBrainsMono_600SemiBold,
+  JetBrainsMono_700Bold,
+  JetBrainsMono_800ExtraBold,
   useFonts as useJetBrainsMono,
 } from "@expo-google-fonts/jetbrains-mono";
 import {
   Syne_400Regular,
   Syne_600SemiBold,
   Syne_700Bold,
+  Syne_800ExtraBold,
   useFonts as useSyne,
 } from "@expo-google-fonts/syne";
 import {
@@ -31,11 +34,14 @@ export default function RootLayout() {
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,
+    JetBrainsMono_700Bold,
+    JetBrainsMono_800ExtraBold,
   });
   const [syneFontsLoaded, syneFontError] = useSyne({
     Syne_400Regular,
     Syne_600SemiBold,
     Syne_700Bold,
+    Syne_800ExtraBold,
   });
   const [syneMonoFontsLoaded, syneMonoFontError] = useSyneMono({
     SyneMono_400Regular,

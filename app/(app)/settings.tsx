@@ -642,11 +642,6 @@ export default function SettingsScreen() {
     { label: t("settings.min_15"), value: 15 },
   ];
 
-  const themeOptions: { label: string; value: "dark" | "dim" | "oled" }[] = [
-    { label: t("settings.dark"), value: "dark" },
-    { label: t("settings.dim"), value: "dim" },
-    { label: t("settings.oled"), value: "oled" },
-  ];
   const backupModeOptions: { label: string; value: "plain" | "encrypted" }[] = [
     { label: t("settings.backup_mode_plain"), value: "plain" },
     { label: t("settings.backup_mode_encrypted"), value: "encrypted" },
@@ -968,27 +963,24 @@ export default function SettingsScreen() {
       {/* ── APPEARANCE ── */}
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
         <SectionHeader label={t("settings.appearance")} />
-        <View style={[styles.row, { borderTopColor: C.wireGray }]}>
+        <TouchableOpacity
+          style={[styles.row, { borderTopColor: C.wireGray }]}
+          onPress={() => router.push("/(app)/theme")}
+        >
           <View style={[styles.iconBox, { backgroundColor: `${C.amberSignal}18` }]}>
-            <Feather name="moon" size={14} color={C.amberSignal} />
+            <Feather name="sliders" size={14} color={C.amberSignal} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.theme")}</Text>
+            <Text style={[styles.rowLabel, { color: C.cipherWhite }]}>{t("settings.theme_page")}</Text>
             <Text style={[styles.rowSub, { color: C.slateText }]}>
-              {appSettings.theme === "dark"
-                ? t("settings.theme_dark_desc")
-                : appSettings.theme === "dim"
-                ? t("settings.theme_dim_desc")
-                : t("settings.theme_oled_desc")}
+              {t("settings.theme_summary", {
+                size: appSettings.fontSizePercent === 0 ? t("settings.default_value") : `${appSettings.fontSizePercent}%`,
+                weight: t(`settings.font_weight_${appSettings.fontWeight}`),
+              })}
             </Text>
           </View>
-          <PillGroup
-            options={themeOptions}
-            value={appSettings.theme}
-            onChange={(v) => updateAppSettings({ theme: v })}
-            C={C}
-          />
-        </View>
+          <Feather name="chevron-right" size={14} color={C.ghostText} />
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.section, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
