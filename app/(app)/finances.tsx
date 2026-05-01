@@ -12,7 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useLedger, OweEntry, LendEntry, SavingsGoal } from "@/context/LedgerContext";
+import { useLedger, OweEntry, LendEntry, SavingsGoal, AssetEntry } from "@/context/LedgerContext";
 import { computeNetWorth } from "@/utils/netWorth";
 import { getThemeColors } from "@/constants/colors";
 import { useI18n } from "@/utils/i18n";
@@ -56,6 +56,10 @@ function ProgressBar({
 type FinanceActionTarget =
   | { kind: "owe"; entry: OweEntry }
   | { kind: "lend"; entry: LendEntry };
+
+type FinanceDeleteTarget =
+  | FinanceActionTarget
+  | { kind: "asset"; entry: AssetEntry };
 
 type MoneySourceValue = "spendable" | "savings" | `asset:${string}`;
 
@@ -153,6 +157,7 @@ export default function FinancesScreen() {
   const [assetLabel, setAssetLabel] = useState("");
   const [assetValue, setAssetValue] = useState("");
   const [assetType, setAssetType] = useState<"asset" | "liability">("asset");
+  const [assetFromSpendable, setAssetFromSpendable] = useState(false);
   const [assetWithdrawSource, setAssetWithdrawSource] = useState<MoneySourceValue | null>(null);
   const [assetWithdrawAmount, setAssetWithdrawAmount] = useState("");
   const [assetWithdrawNote, setAssetWithdrawNote] = useState("");
@@ -183,7 +188,7 @@ export default function FinancesScreen() {
   const [repaySource, setRepaySource] = useState<MoneySourceValue>("spendable");
   const [settledExpanded, setSettledExpanded] = useState(false);
   const [actionTarget, setActionTarget] = useState<FinanceActionTarget | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<FinanceActionTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FinanceDeleteTarget | null>(null);
 
   const [showAddLend, setShowAddLend] = useState(false);
   const [lendName, setLendName] = useState("");
@@ -280,6 +285,14 @@ export default function FinancesScreen() {
     setAssetWithdrawDate(todayStr());
   };
 
+  const resetAssetForm = () => {
+    setEditingAsset(null);
+    setAssetLabel("");
+    setAssetValue("");
+    setAssetType("asset");
+    setAssetFromSpendable(false);
+  };
+
   const openAssetWithdraw = (assetId?: string) => {
     setAssetWithdrawSource(assetId ? (`asset:${assetId}` as const) : manualAssets[0] ? (`asset:${manualAssets[0].id}` as const) : null);
     setAssetWithdrawAmount("");
@@ -301,13 +314,20 @@ export default function FinancesScreen() {
     if (!assetLabel.trim() || isNaN(v) || v <= 0) return;
     if (editingAsset) {
       updateAssetEntry(editingAsset, { label: assetLabel.trim(), value: v, type: assetType });
-      setEditingAsset(null);
     } else {
+      if (assetFromSpendable && assetType === "asset") {
+        if (v > nw.spendableBalance) return;
+        addTransaction({
+          type: "expense",
+          amount: v,
+          category: "Other",
+          note: t("finances.add_asset_from_spendable_note", { asset: assetLabel.trim() }),
+          date: todayStr(),
+        });
+      }
       addAssetEntry({ label: assetLabel.trim(), value: v, type: assetType, isManual: true });
     }
-    setAssetLabel("");
-    setAssetValue("");
-    setAssetType("asset");
+    resetAssetForm();
     setShowAddAsset(false);
   };
 
@@ -438,6 +458,10 @@ export default function FinancesScreen() {
     setDeleteTarget({ kind: "lend", entry: lend });
   };
 
+  const confirmDeleteAsset = (asset: AssetEntry) => {
+    setDeleteTarget({ kind: "asset", entry: asset });
+  };
+
   const showOweActions = (owe: OweEntry) => {
     setActionTarget({ kind: "owe", entry: owe });
   };
@@ -457,13 +481,29 @@ export default function FinancesScreen() {
         setRepayNote("");
         setRepayDate(todayStr());
       }
-    } else {
+    } else if (deleteTarget.kind === "lend") {
       deleteLendEntry(deleteTarget.entry.id);
       if (repayingLendId === deleteTarget.entry.id) {
         setRepayingLendId(null);
         setLendRepayAmt("");
         setLendRepayNote("");
         setLendRepayDate(todayStr());
+      }
+    } else {
+      deleteAssetEntry(deleteTarget.entry.id);
+      if (editingAsset === deleteTarget.entry.id) {
+        resetAssetForm();
+        setShowAddAsset(false);
+      }
+      if (assetWithdrawSource === `asset:${deleteTarget.entry.id}`) {
+        resetAssetWithdrawForm();
+        setShowAssetWithdraw(false);
+      }
+      if (liabilityRepaySource === `asset:${deleteTarget.entry.id}`) {
+        setLiabilityRepaySource("spendable");
+      }
+      if (repayingLiabilityId === deleteTarget.entry.id) {
+        resetLiabilityRepayForm();
       }
     }
 
@@ -613,6 +653,10 @@ export default function FinancesScreen() {
   const deleteTitle = deleteTarget
     ? deleteTarget.kind === "owe"
       ? t("finances.remove_debt_title")
+      : deleteTarget.kind === "asset"
+      ? deleteTarget.entry.type === "asset"
+        ? t("finances.delete_asset_title")
+        : t("finances.delete_liability_title")
       : t("finances.remove_lend_title")
     : "";
   const deleteDescription = deleteTarget
@@ -623,12 +667,16 @@ export default function FinancesScreen() {
             count: deleteTarget.entry.repayments.length,
           })
         : t("finances.delete_debt_single", { name: deleteTarget.entry.personName })
-      : deleteTarget.entry.repayments.length > 0
+      : deleteTarget.kind === "lend"
+      ? deleteTarget.entry.repayments.length > 0
       ? t("finances.delete_lend_with_records", {
           name: deleteTarget.entry.personName,
           count: deleteTarget.entry.repayments.length,
         })
       : t("finances.delete_lend_single", { name: deleteTarget.entry.personName })
+      : deleteTarget.entry.type === "asset"
+      ? t("finances.delete_asset_single", { name: deleteTarget.entry.label })
+      : t("finances.delete_liability_single", { name: deleteTarget.entry.label })
     : "";
   const actionDescription = actionTarget
     ? actionTarget.kind === "owe"
@@ -702,7 +750,7 @@ export default function FinancesScreen() {
                   setAssetType("asset");
                   setShowAddAsset(true);
                 }}
-                onDelete={() => deleteAssetEntry(a.id)}
+                onDelete={() => confirmDeleteAsset(a)}
                 onAction={() => openAssetWithdraw(a.id)}
                 actionIcon="corner-down-left"
               />
@@ -737,7 +785,7 @@ export default function FinancesScreen() {
                   setAssetType("liability");
                   setShowAddAsset(true);
                 }}
-                onDelete={() => deleteAssetEntry(a.id)}
+                onDelete={() => confirmDeleteAsset(a)}
                 onAction={() => {
                   setRepayingLiabilityId(a.id);
                   setLiabilityRepayAmount(String(a.value));
@@ -1231,11 +1279,14 @@ export default function FinancesScreen() {
         C={C}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirmed}
+        confirmLabel={
+          deleteTarget?.kind === "asset" ? t("common.delete") : t("finances.remove")
+        }
         t={t}
       />
 
       {/* OVERLAYS */}
-      <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); setEditingAsset(null); }} C={C} title={editingAsset ? `${t("finances.edit")} ${t("finances.type")}` : t("finances.add_asset_liability")}>
+      <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); resetAssetForm(); }} C={C} title={editingAsset ? `${t("finances.edit")} ${t("finances.type")}` : t("finances.add_asset_liability")}>
         <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.label")}</Text>
         <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetLabel} onChangeText={setAssetLabel} placeholder={t("finances.asset_placeholder")} placeholderTextColor={C.ghostText} />
         <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.value")}</Text>
@@ -1248,6 +1299,37 @@ export default function FinancesScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        {!editingAsset && assetType === "asset" && (
+          <>
+            <Text style={[styles.inlineMeta, { color: C.ghostText }]}>
+              {t("finances.available_balance", { amount: formatAmount(nw.spendableBalance) })}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.fundingToggle,
+                {
+                  borderColor: assetFromSpendable ? C.creditGreen : C.wireGray,
+                  backgroundColor: assetFromSpendable ? `${C.creditGreen}15` : "transparent",
+                },
+              ]}
+              onPress={() => setAssetFromSpendable((value) => !value)}
+            >
+              <View style={styles.fundingToggleTextWrap}>
+                <Text style={[styles.fundingToggleTitle, { color: assetFromSpendable ? C.creditGreen : C.cipherWhite }]}>
+                  {t("finances.add_from_spendable")}
+                </Text>
+                <Text style={[styles.fundingToggleMeta, { color: C.slateText }]}>
+                  {t("finances.add_from_spendable_hint")}
+                </Text>
+              </View>
+              <Feather
+                name={assetFromSpendable ? "check-circle" : "circle"}
+                size={16}
+                color={assetFromSpendable ? C.creditGreen : C.ghostText}
+              />
+            </TouchableOpacity>
+          </>
+        )}
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]} onPress={handleAddAsset}>
           <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{editingAsset ? t("common.update") : t("common.add")}</Text>
         </TouchableOpacity>
@@ -1667,6 +1749,7 @@ function FinanceConfirmModal({
   C,
   onClose,
   onConfirm,
+  confirmLabel,
   t,
 }: {
   visible: boolean;
@@ -1675,6 +1758,7 @@ function FinanceConfirmModal({
   C: ReturnType<typeof getThemeColors>;
   onClose: () => void;
   onConfirm: () => void;
+  confirmLabel?: string;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   return (
@@ -1700,7 +1784,7 @@ function FinanceConfirmModal({
               style={[styles.dialogHalfBtn, { borderColor: `${C.debitRed}55`, backgroundColor: `${C.debitRed}10` }]}
               onPress={onConfirm}
             >
-              <Text style={[styles.dialogDangerText, { color: C.debitRed }]}>{t("finances.remove")}</Text>
+              <Text style={[styles.dialogDangerText, { color: C.debitRed }]}>{confirmLabel ?? t("finances.remove")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2218,6 +2302,31 @@ const styles = StyleSheet.create({
     fontFamily: "SyneMono_400Regular",
     fontSize: 10,
     letterSpacing: 1,
+  },
+  fundingToggle: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  fundingToggleTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  fundingToggleTitle: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  fundingToggleMeta: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    lineHeight: 15,
   },
   goalChip: {
     paddingHorizontal: 10,

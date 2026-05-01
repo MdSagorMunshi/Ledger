@@ -55,6 +55,7 @@ const CHANGELOGS = [
       "about.changelog_300_7",
       "about.changelog_300_8",
       "about.changelog_300_9",
+      "about.changelog_300_10",
     ],
   },
   {
