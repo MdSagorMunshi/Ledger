@@ -1,6 +1,9 @@
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
+  DevSettings,
+  Easing,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -40,7 +43,24 @@ export default function ThemeScreen() {
   const { appSettings, updateAppSettings } = useLedger();
   const { t } = useI18n();
   const C = getThemeColors(appSettings.theme);
+  const [needsRestart, setNeedsRestart] = useState(false);
+  const dialRef = useRef<View>(null);
+  const dialFrameRef = useRef({ x: 0, y: 0 });
   const knobScale = useRef(new Animated.Value(1)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(pulse, {
+        toValue: 1,
+        duration: 4200,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
 
   const themeOptions: { label: string; value: AppSettings["theme"]; desc: string }[] = [
     { label: t("settings.dark"), value: "dark", desc: t("settings.theme_dark_desc") },
@@ -55,12 +75,44 @@ export default function ThemeScreen() {
     { label: t("settings.font_weight_extrabold"), value: "extrabold" },
   ];
 
-  const setFontPercentFromTouch = (x: number, y: number) => {
-    const dx = x - DIAL_CENTER;
-    const dy = y - DIAL_CENTER;
+  const markChanged = (updates: Partial<AppSettings>) => {
+    updateAppSettings(updates);
+    setNeedsRestart(true);
+  };
+
+  const syncDialFrame = () => {
+    dialRef.current?.measureInWindow((x, y) => {
+      dialFrameRef.current = { x, y };
+    });
+  };
+
+  const setFontPercentFromPage = (pageX: number, pageY: number) => {
+    const dx = pageX - dialFrameRef.current.x - DIAL_CENTER;
+    const dy = pageY - dialFrameRef.current.y - DIAL_CENTER;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 48) return;
     const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
     const normalized = (angle + 450) % 360;
-    updateAppSettings({ fontSizePercent: clampPercent(normalized / 3.6) });
+    const nextPercent = clampPercent(normalized / 3.6);
+    if (nextPercent !== appSettings.fontSizePercent) {
+      markChanged({ fontSizePercent: nextPercent });
+    }
+  };
+
+  const resetThemeDefaults = () => {
+    markChanged({
+      theme: "dark",
+      fontSizePercent: 0,
+      fontWeight: "default",
+    });
+  };
+
+  const restartApp = () => {
+    try {
+      DevSettings.reload("Theme settings changed");
+    } catch {
+      Alert.alert(t("settings.restart_required_title"), t("settings.restart_unavailable"));
+    }
   };
 
   const panResponder = useMemo(
@@ -69,11 +121,15 @@ export default function ThemeScreen() {
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (evt) => {
+          syncDialFrame();
           Animated.spring(knobScale, { toValue: 1.16, useNativeDriver: true }).start();
-          setFontPercentFromTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
+          dialRef.current?.measureInWindow((x, y) => {
+            dialFrameRef.current = { x, y };
+            setFontPercentFromPage(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+          });
         },
         onPanResponderMove: (evt) => {
-          setFontPercentFromTouch(evt.nativeEvent.locationX, evt.nativeEvent.locationY);
+          setFontPercentFromPage(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         },
         onPanResponderRelease: () => {
           Animated.spring(knobScale, { toValue: 1, friction: 5, useNativeDriver: true }).start();
@@ -82,7 +138,7 @@ export default function ThemeScreen() {
           Animated.spring(knobScale, { toValue: 1, friction: 5, useNativeDriver: true }).start();
         },
       }),
-    [knobScale]
+    [appSettings.fontSizePercent, knobScale]
   );
 
   const fontPercent = appSettings.fontSizePercent ?? 0;
@@ -90,6 +146,9 @@ export default function ThemeScreen() {
   const previewWeight = appSettings.fontWeight ?? "default";
   const previewTitleFamily = resolveFontFamily("Syne_700Bold", previewWeight);
   const previewBodyFamily = resolveFontFamily("JetBrainsMono_400Regular", previewWeight);
+  const ringScale = pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.96, 1.06, 0.96] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.25, 0.72, 0.25] });
+  const ringRotate = pulse.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   return (
     <ScrollView
@@ -127,7 +186,7 @@ export default function ThemeScreen() {
                     backgroundColor: active ? `${C.amberSignal}14` : C.inkSurface,
                   },
                 ]}
-                onPress={() => updateAppSettings({ theme: option.value })}
+                onPress={() => markChanged({ theme: option.value })}
               >
                 <Text style={[styles.themeTileLabel, { color: active ? C.amberSignal : C.cipherWhite }]}>
                   {option.label}
@@ -143,7 +202,34 @@ export default function ThemeScreen() {
         <Text style={[styles.sectionTitle, { color: C.amberSignal }]}>{t("settings.font_size")}</Text>
         <Text style={[styles.sectionCopy, { color: C.slateText }]}>{t("settings.font_size_desc")}</Text>
         <View style={styles.dialWrap}>
-          <View style={styles.dial} {...panResponder.panHandlers}>
+          <View
+            ref={dialRef}
+            style={styles.dial}
+            onLayout={syncDialFrame}
+            {...panResponder.panHandlers}
+          >
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.dialOrbit,
+                {
+                  borderColor: `${C.amberSignal}55`,
+                  opacity: ringOpacity,
+                  transform: [{ scale: ringScale }, { rotate: ringRotate }],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.dialOrbitInner,
+                {
+                  borderColor: `${C.creditGreen}44`,
+                  opacity: ringOpacity,
+                  transform: [{ scale: ringScale }],
+                },
+              ]}
+            />
             {Array.from({ length: DOT_COUNT }).map((_, index) => {
               const dotPercent = Math.round((index / DOT_COUNT) * 100);
               const point = pointForPercent(dotPercent);
@@ -158,6 +244,7 @@ export default function ThemeScreen() {
                       top: point.top - 3,
                       backgroundColor: active ? C.amberSignal : C.wireGray,
                       opacity: active ? 1 : 0.55,
+                      transform: [{ scale: active ? 1.22 : 1 }],
                     },
                   ]}
                 />
@@ -179,7 +266,7 @@ export default function ThemeScreen() {
             </Animated.View>
             <View style={[styles.dialCenter, { backgroundColor: C.inkSurface, borderColor: C.wireGray }]}>
               <Text style={[styles.dialValue, { color: C.cipherWhite }]}>
-                {fontPercent === 0 ? t("settings.default_value") : `${fontPercent}%`}
+                {`${fontPercent}%`}
               </Text>
               <Text style={[styles.dialLabel, { color: C.ghostText }]}>{t("settings.font_size")}</Text>
             </View>
@@ -202,7 +289,7 @@ export default function ThemeScreen() {
                     backgroundColor: active ? `${C.amberSignal}14` : "transparent",
                   },
                 ]}
-                onPress={() => updateAppSettings({ fontWeight: option.value })}
+                onPress={() => markChanged({ fontWeight: option.value })}
               >
                 <Text style={[styles.weightBtnText, { color: active ? C.amberSignal : C.slateText }]}>
                   {option.label}
@@ -250,6 +337,42 @@ export default function ThemeScreen() {
         >
           {t("settings.theme_preview_text")}
         </Text>
+      </View>
+
+      <View style={[styles.actionsCard, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+        {needsRestart && (
+          <View style={[styles.restartNotice, { backgroundColor: `${C.amberSignal}12`, borderColor: `${C.amberSignal}44` }]}>
+            <Feather name="refresh-cw" size={14} color={C.amberSignal} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.restartTitle, { color: C.cipherWhite }]}>{t("settings.restart_required_title")}</Text>
+              <Text style={[styles.restartCopy, { color: C.slateText }]}>{t("settings.restart_required_desc")}</Text>
+            </View>
+          </View>
+        )}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.secondaryAction, { borderColor: C.wireGray }]}
+            onPress={resetThemeDefaults}
+          >
+            <Text style={[styles.secondaryActionText, { color: C.slateText }]}>{t("settings.set_all_default")}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.primaryAction,
+              {
+                borderColor: needsRestart ? C.amberSignal : C.wireGray,
+                backgroundColor: needsRestart ? `${C.amberSignal}18` : "transparent",
+                opacity: needsRestart ? 1 : 0.55,
+              },
+            ]}
+            onPress={restartApp}
+            disabled={!needsRestart}
+          >
+            <Text style={[styles.primaryActionText, { color: needsRestart ? C.amberSignal : C.ghostText }]}>
+              {t("settings.restart_app")}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -349,6 +472,25 @@ const styles = StyleSheet.create({
     width: DIAL_SIZE,
     height: DIAL_SIZE,
   },
+  dialOrbit: {
+    position: "absolute",
+    left: 28,
+    top: 28,
+    width: 184,
+    height: 184,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderStyle: "dashed",
+  },
+  dialOrbitInner: {
+    position: "absolute",
+    left: 44,
+    top: 44,
+    width: 152,
+    height: 152,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
   dialDot: {
     position: "absolute",
     width: 6,
@@ -423,5 +565,60 @@ const styles = StyleSheet.create({
   },
   previewBody: {
     lineHeight: 20,
+  },
+  actionsCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    gap: 12,
+  },
+  restartNotice: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    gap: 10,
+  },
+  restartTitle: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  restartCopy: {
+    marginTop: 4,
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    lineHeight: 15,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  secondaryAction: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  secondaryActionText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  primaryAction: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  primaryActionText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
 });
