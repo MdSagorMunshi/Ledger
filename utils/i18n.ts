@@ -275,6 +275,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "about.tagline": "Local-First Finance Tracker",
     "about.current": "CURRENT",
     "about.stable": "STABLE",
+    "about.previous": "PREVIOUS",
     "about.launch": "LAUNCH",
     "about.stack_runtime": "RUNTIME",
     "about.stack_runtime_value": "Expo / React Native",

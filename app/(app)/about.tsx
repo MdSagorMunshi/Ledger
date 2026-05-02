@@ -44,7 +44,7 @@ const CHANGELOGS = [
   {
     version: "3.0.0",
     date: "2026-04-23",
-    labelKey: "about.current",
+    labelKey: "about.stable",
     entries: [
       "about.changelog_300_1",
       "about.changelog_300_2",
@@ -63,7 +63,7 @@ const CHANGELOGS = [
   {
     version: "2.0.0",
     date: "2026-04-21",
-    labelKey: "about.stable",
+    labelKey: "about.previous",
     entries: [
       "about.changelog_200_1",
       "about.changelog_200_2",

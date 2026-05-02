@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
-  DevSettings,
   Easing,
   PanResponder,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { reloadAppAsync } from "expo";
 import { router } from "expo-router";
 import { useLedger, AppSettings } from "@/context/LedgerContext";
 import { getThemeColors } from "@/constants/colors";
@@ -107,9 +108,13 @@ export default function ThemeScreen() {
     });
   };
 
-  const restartApp = () => {
+  const restartApp = async () => {
     try {
-      DevSettings.reload("Theme settings changed");
+      if (Platform.OS === "web") {
+        window.location.reload();
+        return;
+      }
+      await reloadAppAsync("Theme settings changed");
     } catch {
       Alert.alert(t("settings.restart_required_title"), t("settings.restart_unavailable"));
     }
