@@ -52,6 +52,19 @@ function BudgetAlert({ category, pct, remaining, C }: {
   );
 }
 
+function getCurrentMonthKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+
+
 export default function Dashboard() {
   const {
     transactions,
@@ -68,7 +81,57 @@ export default function Dashboard() {
   const C = getThemeColors(appSettings.theme);
   const { t, tc } = useI18n();
 
-  const regularTxs = transactions.filter(
+  const currentMonthKey = getCurrentMonthKey();
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const isCurrentMonth = selectedMonth === currentMonthKey;
+
+  // Get all unique months from transactions
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    months.add(currentMonthKey);
+    transactions.forEach((tx) => {
+      if (tx.date && tx.date.length >= 7) {
+        months.add(tx.date.substring(0, 7));
+      }
+    });
+    return Array.from(months).sort();
+  }, [transactions, currentMonthKey]);
+
+  const canGoBack = useMemo(() => {
+    const idx = availableMonths.indexOf(selectedMonth);
+    return idx > 0;
+  }, [availableMonths, selectedMonth]);
+
+  const canGoForward = useMemo(() => {
+    const idx = availableMonths.indexOf(selectedMonth);
+    return idx < availableMonths.length - 1;
+  }, [availableMonths, selectedMonth]);
+
+  const goToPrevMonth = () => {
+    const idx = availableMonths.indexOf(selectedMonth);
+    if (idx > 0) {
+      setSelectedMonth(availableMonths[idx - 1]);
+    }
+  };
+
+  const goToNextMonth = () => {
+    const idx = availableMonths.indexOf(selectedMonth);
+    if (idx < availableMonths.length - 1) {
+      setSelectedMonth(availableMonths[idx + 1]);
+    }
+  };
+
+  const goToCurrentMonth = () => {
+    setSelectedMonth(currentMonthKey);
+  };
+
+  // Filter transactions for selected month
+  const monthTransactions = useMemo(
+    () => transactions.filter((tx) => tx.date && tx.date.startsWith(selectedMonth)),
+    [transactions, selectedMonth]
+  );
+
+  const regularTxs = monthTransactions.filter(
     (t) =>
       t.subtype !== "savings_transfer" &&
       t.subtype !== "savings_withdrawal" &&
@@ -97,19 +160,19 @@ export default function Dashboard() {
     [transactions, savingsTransactions, assetEntries, oweEntries, lendEntries]
   );
 
-  const recentFive = transactions.slice(0, 5);
+  const recentFive = monthTransactions.slice(0, 5);
   const isEmpty = transactions.length === 0;
 
   const envelopeAlerts = useMemo(() => {
     return budgetEnvelopes
       .map((env) => {
-        const spent = computeBudgetProgress(transactions, env.category);
+        const spent = computeBudgetProgress(monthTransactions, env.category);
         const pct = env.monthlyLimit > 0 ? spent / env.monthlyLimit : 0;
         const remaining = env.monthlyLimit - spent;
         return { env, pct, remaining };
       })
       .filter(({ pct }) => pct >= 0.8);
-  }, [transactions, budgetEnvelopes]);
+  }, [monthTransactions, budgetEnvelopes]);
 
   const [alertsShown, setAlertsShown] = useState<string[]>([]);
   const triggeredAlerts = useMemo(
@@ -128,6 +191,13 @@ export default function Dashboard() {
       }
     }
   }, [lastAddedId, envelopeAlerts]);
+
+  // Reset to current month when a new transaction is added
+  useEffect(() => {
+    if (lastAddedId) {
+      setSelectedMonth(currentMonthKey);
+    }
+  }, [lastAddedId, currentMonthKey]);
 
   if (isEmpty) {
     return (
@@ -153,14 +223,52 @@ export default function Dashboard() {
     expenseCatMap[t.category] = (expenseCatMap[t.category] || 0) + t.amount;
   });
 
+  const monthHasData = monthTransactions.length > 0;
+
   return (
     <ScrollView
       style={[styles.scroll, { backgroundColor: C.forgeBlack }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* MONTH NAVIGATOR */}
+      <View style={[styles.monthNav, { borderColor: C.wireGray, backgroundColor: C.vaultDark }]}>
+        <TouchableOpacity
+          style={[styles.monthNavBtn, { opacity: canGoBack ? 1 : 0.3 }]}
+          onPress={goToPrevMonth}
+          disabled={!canGoBack}
+        >
+          <Feather name="chevron-left" size={18} color={C.cipherWhite} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={goToCurrentMonth} activeOpacity={isCurrentMonth ? 1 : 0.7}>
+          <View style={styles.monthNavCenter}>
+            <Text style={[styles.monthNavLabel, { color: C.cipherWhite }]}>
+              {formatMonthLabel(selectedMonth)}
+            </Text>
+            {!isCurrentMonth && (
+              <View style={[styles.monthNavCurrentBadge, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]}>
+                <Feather name="rotate-ccw" size={9} color={C.amberSignal} />
+                <Text style={[styles.monthNavCurrentText, { color: C.amberSignal }]}>
+                  {t("dashboard.current")}
+                </Text>
+              </View>
+            )}
+            {isCurrentMonth && (
+              <View style={[styles.monthNavLiveDot, { backgroundColor: C.creditGreen }]} />
+            )}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.monthNavBtn, { opacity: canGoForward ? 1 : 0.3 }]}
+          onPress={goToNextMonth}
+          disabled={!canGoForward}
+        >
+          <Feather name="chevron-right" size={18} color={C.cipherWhite} />
+        </TouchableOpacity>
+      </View>
+
       {/* BUDGET ALERTS */}
-      {triggeredAlerts.length > 0 && (
+      {isCurrentMonth && triggeredAlerts.length > 0 && (
         <View style={styles.alertsContainer}>
           {triggeredAlerts.map(({ env, pct, remaining }) => (
             <BudgetAlert key={env.id} category={env.category} pct={pct} remaining={remaining} C={C} />
@@ -168,59 +276,75 @@ export default function Dashboard() {
         </View>
       )}
 
-      <View style={styles.summaryRow}>
-        <SummaryCard label={t("dashboard.balance")} amount={formatAmount(Math.abs(balance))} color={balanceColor} flex={1.3} />
-        <SummaryCard label={t("dashboard.income")} amount={formatAmount(totalIncome)} color={C.creditGreen} />
-        <SummaryCard label={t("dashboard.expenses")} amount={formatAmount(totalExpense)} color={C.debitRed} />
-      </View>
+      {!monthHasData ? (
+        <View style={styles.emptyMonthState}>
+          <Feather name="calendar" size={32} color={C.ghostText} />
+          <Text style={[styles.emptyMonthText, { color: C.ghostText }]}>
+            {t("dashboard.no_data_for_month")}
+          </Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.summaryRow}>
+            <SummaryCard label={t("dashboard.balance")} amount={formatAmount(Math.abs(balance))} color={balanceColor} flex={1.3} />
+            <SummaryCard label={t("dashboard.income")} amount={formatAmount(totalIncome)} color={C.creditGreen} />
+            <SummaryCard label={t("dashboard.expenses")} amount={formatAmount(totalExpense)} color={C.debitRed} />
+          </View>
 
-      {/* NET WORTH MINI CARD */}
-      <View style={[styles.nwMini, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <Text style={[styles.nwMiniLabel, { color: C.ghostText }]}>{t("dashboard.net_worth")}</Text>
-        <Text style={[styles.nwMiniValue, { color: nwColor }]}>{formatAmount(nw.total)}</Text>
-      </View>
+          {/* NET WORTH MINI CARD */}
+          <View style={[styles.nwMini, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+            <Text style={[styles.nwMiniLabel, { color: C.ghostText }]}>{t("dashboard.net_worth")}</Text>
+            <Text style={[styles.nwMiniValue, { color: nwColor }]}>{formatAmount(nw.total)}</Text>
+          </View>
 
-      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionLabel label={t("dashboard.monthly_overview")} C={C} />
-        <BarChart transactions={regularTxs} formatAmount={formatAmount} />
-      </View>
+          <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+            <SectionLabel label={t("dashboard.monthly_overview")} C={C} />
+            <BarChart transactions={regularTxs} formatAmount={formatAmount} />
+          </View>
 
-      {regularTxs.some((t) => t.type === "expense") && (
-        <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-          <SectionLabel label={t("dashboard.expense_breakdown")} C={C} />
-          <DonutChart transactions={regularTxs} formatAmount={formatAmount} />
-          {/* BUDGET ENVELOPE INDICATORS */}
-          {budgetEnvelopes.length > 0 && (
-            <View style={styles.envelopeList}>
-              {budgetEnvelopes.map((env) => {
-                const catTotal = expenseCatMap[env.category] || 0;
-                const pct = Math.min(1, env.monthlyLimit > 0 ? catTotal / env.monthlyLimit : 0);
-                const barColor = pct >= 1 ? C.debitRed : pct >= 0.8 ? C.amberSignal : C.ghostText;
-                return (
-                  <View key={env.id} style={styles.envelopeItem}>
-                    <Text style={[styles.envelopeCat, { color: C.slateText }]}>{tc(env.category)}</Text>
-                    <View style={[styles.envelopeBar, { backgroundColor: C.wireGray }]}>
-                      <View style={[styles.envelopeFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
-                    </View>
-                  </View>
-                );
-              })}
+          {regularTxs.some((t) => t.type === "expense") && (
+            <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+              <SectionLabel label={t("dashboard.expense_breakdown")} C={C} />
+              <DonutChart transactions={regularTxs} formatAmount={formatAmount} />
+              {/* BUDGET ENVELOPE INDICATORS */}
+              {budgetEnvelopes.length > 0 && (
+                <View style={styles.envelopeList}>
+                  {budgetEnvelopes.map((env) => {
+                    const catTotal = expenseCatMap[env.category] || 0;
+                    const pct = Math.min(1, env.monthlyLimit > 0 ? catTotal / env.monthlyLimit : 0);
+                    const barColor = pct >= 1 ? C.debitRed : pct >= 0.8 ? C.amberSignal : C.ghostText;
+                    return (
+                      <View key={env.id} style={styles.envelopeItem}>
+                        <Text style={[styles.envelopeCat, { color: C.slateText }]}>{tc(env.category)}</Text>
+                        <View style={[styles.envelopeBar, { backgroundColor: C.wireGray }]}>
+                          <View style={[styles.envelopeFill, { width: `${pct * 100}%` as any, backgroundColor: barColor }]} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
-        </View>
-      )}
 
-      <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
-        <SectionLabel label={t("dashboard.recent_entries")} C={C} />
-        {recentFive.map((tx) => (
-          <TransactionRow
-            key={tx.id}
-            transaction={tx}
-            formatAmount={formatAmount}
-            highlight={tx.id === lastAddedId}
-          />
-        ))}
-      </View>
+          <View style={[styles.card, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
+            <SectionLabel label={isCurrentMonth ? t("dashboard.recent_entries") : t("dashboard.entries_this_month")} C={C} />
+            {recentFive.map((tx) => (
+              <TransactionRow
+                key={tx.id}
+                transaction={tx}
+                formatAmount={formatAmount}
+                highlight={tx.id === lastAddedId}
+              />
+            ))}
+            {monthTransactions.length > 5 && (
+              <Text style={[styles.moreEntriesText, { color: C.ghostText }]}>
+                +{monthTransactions.length - 5} {t("dashboard.more_entries")}
+              </Text>
+            )}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -257,6 +381,51 @@ const styles = StyleSheet.create({
   nwMiniValue: {
     fontFamily: "JetBrainsMono_600SemiBold",
     fontSize: 18,
+  },
+  monthNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+  },
+  monthNavBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  monthNavCenter: {
+    alignItems: "center",
+    gap: 4,
+  },
+  monthNavLabel: {
+    fontFamily: "Syne_700Bold",
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+  monthNavCurrentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  monthNavCurrentText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 8,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  monthNavLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   alertsContainer: { gap: 6 },
   budgetAlert: {
@@ -318,5 +487,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 1.2,
+  },
+  emptyMonthState: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 48,
+  },
+  emptyMonthText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+    textAlign: "center",
+  },
+  moreEntriesText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    textAlign: "center",
+    letterSpacing: 1,
+    marginTop: 4,
   },
 });

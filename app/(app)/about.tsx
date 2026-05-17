@@ -16,8 +16,8 @@ import { useI18n } from "@/utils/i18n";
 
 const APP_INFO = {
   name: "LEDGER",
-  version: "3.0.0",
-  lastUpdate: "2026-05-02",
+  version: "3.1.0",
+  lastUpdate: "2026-05-18",
   license: "MIT",
   sourceUrl: "https://github.com/MdSagorMunshi/Ledger",
 };
@@ -41,6 +41,15 @@ const TECH_STACK = [
 ];
 
 const CHANGELOGS = [
+  {
+    version: "3.1.0",
+    date: "2026-05-18",
+    labelKey: "about.current",
+    entries: [
+      "about.changelog_310_1",
+      "about.changelog_310_2",
+    ],
+  },
   {
     version: "3.0.0",
     date: "2026-05-02",

@@ -158,6 +158,7 @@ export default function FinancesScreen() {
   const [assetValue, setAssetValue] = useState("");
   const [assetType, setAssetType] = useState<"asset" | "liability">("asset");
   const [assetFromSpendable, setAssetFromSpendable] = useState(false);
+  const [addToExistingAssetId, setAddToExistingAssetId] = useState<string | null>(null);
   const [assetWithdrawSource, setAssetWithdrawSource] = useState<MoneySourceValue | null>(null);
   const [assetWithdrawAmount, setAssetWithdrawAmount] = useState("");
   const [assetWithdrawNote, setAssetWithdrawNote] = useState("");
@@ -291,6 +292,7 @@ export default function FinancesScreen() {
     setAssetValue("");
     setAssetType("asset");
     setAssetFromSpendable(false);
+    setAddToExistingAssetId(null);
   };
 
   const openAssetWithdraw = (assetId?: string) => {
@@ -314,6 +316,21 @@ export default function FinancesScreen() {
     if (!assetLabel.trim() || isNaN(v) || v <= 0) return;
     if (editingAsset) {
       updateAssetEntry(editingAsset, { label: assetLabel.trim(), value: v, type: assetType });
+    } else if (addToExistingAssetId) {
+      // Add value to existing asset
+      const existing = manualAssets.find((a) => a.id === addToExistingAssetId);
+      if (!existing) return;
+      if (assetFromSpendable) {
+        if (v > nw.spendableBalance) return;
+        addTransaction({
+          type: "expense",
+          amount: v,
+          category: "Other",
+          note: t("finances.add_asset_from_spendable_note", { asset: existing.label }),
+          date: todayStr(),
+        });
+      }
+      updateAssetEntry(addToExistingAssetId, { value: existing.value + v });
     } else {
       if (assetFromSpendable && assetType === "asset") {
         if (v > nw.spendableBalance) return;
@@ -1288,13 +1305,68 @@ export default function FinancesScreen() {
       {/* OVERLAYS */}
       <SimpleOverlay visible={showAddAsset} onClose={() => { setShowAddAsset(false); resetAssetForm(); }} C={C} title={editingAsset ? `${t("finances.edit")} ${t("finances.type")}` : t("finances.add_asset_liability")}>
         <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.label")}</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetLabel} onChangeText={setAssetLabel} placeholder={t("finances.asset_placeholder")} placeholderTextColor={C.ghostText} />
-        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.value")}</Text>
-        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetValue} onChangeText={setAssetValue} placeholder={t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: addToExistingAssetId ? C.slateText : C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetLabel} onChangeText={addToExistingAssetId ? undefined : setAssetLabel} placeholder={t("finances.asset_placeholder")} placeholderTextColor={C.ghostText} editable={!addToExistingAssetId} />
+        {/* Existing assets selector - only shown when adding new (not editing) and in asset mode */}
+        {!editingAsset && assetType === "asset" && manualAssets.length > 0 && (
+          <>
+            <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.add_to_existing")}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.existingAssetScroll} contentContainerStyle={styles.existingAssetScrollContent}>
+              <TouchableOpacity
+                style={[
+                  styles.existingAssetChip,
+                  {
+                    borderColor: addToExistingAssetId === null ? C.amberSignal : C.wireGray,
+                    backgroundColor: addToExistingAssetId === null ? `${C.amberSignal}15` : "transparent",
+                  },
+                ]}
+                onPress={() => {
+                  setAddToExistingAssetId(null);
+                  setAssetLabel("");
+                }}
+              >
+                <Feather name="plus" size={11} color={addToExistingAssetId === null ? C.amberSignal : C.ghostText} />
+                <Text style={[styles.existingAssetChipText, { color: addToExistingAssetId === null ? C.amberSignal : C.slateText }]}>
+                  {t("finances.new_asset")}
+                </Text>
+              </TouchableOpacity>
+              {manualAssets.map((a) => (
+                <TouchableOpacity
+                  key={a.id}
+                  style={[
+                    styles.existingAssetChip,
+                    {
+                      borderColor: addToExistingAssetId === a.id ? C.creditGreen : C.wireGray,
+                      backgroundColor: addToExistingAssetId === a.id ? `${C.creditGreen}15` : "transparent",
+                    },
+                  ]}
+                  onPress={() => {
+                    setAddToExistingAssetId(a.id);
+                    setAssetLabel(a.label);
+                  }}
+                >
+                  <Text style={[styles.existingAssetChipText, { color: addToExistingAssetId === a.id ? C.creditGreen : C.cipherWhite }]}>
+                    {a.label}
+                  </Text>
+                  <Text style={[styles.existingAssetChipAmount, { color: addToExistingAssetId === a.id ? C.creditGreen : C.ghostText }]}>
+                    {formatAmount(a.value)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
+        <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{addToExistingAssetId ? t("finances.add_amount") : t("finances.value")}</Text>
+        <TextInput style={[styles.overlayInput, { borderColor: C.wireGray, color: C.cipherWhite, backgroundColor: C.forgeBlack }]} value={assetValue} onChangeText={setAssetValue} placeholder={addToExistingAssetId ? t("finances.add_amount_placeholder") : t("finances.amount_placeholder")} placeholderTextColor={C.ghostText} keyboardType="decimal-pad" />
+        {addToExistingAssetId && (
+          <Text style={[styles.inlineMeta, { color: C.ghostText }]}>
+            {t("finances.current_value")}: {formatAmount(manualAssets.find((a) => a.id === addToExistingAssetId)?.value ?? 0)}
+            {assetValue ? ` → ${formatAmount((manualAssets.find((a) => a.id === addToExistingAssetId)?.value ?? 0) + (parseFloat(assetValue) || 0))}` : ""}
+          </Text>
+        )}
         <Text style={[styles.overlayLabel, { color: C.ghostText }]}>{t("finances.type")}</Text>
         <View style={styles.typeToggle}>
           {(["asset", "liability"] as const).map((t) => (
-            <TouchableOpacity key={t} style={[styles.typeBtn, { borderColor: assetType === t ? C.amberSignal : C.wireGray, backgroundColor: assetType === t ? `${C.amberSignal}15` : "transparent" }]} onPress={() => setAssetType(t)}>
+            <TouchableOpacity key={t} style={[styles.typeBtn, { borderColor: assetType === t ? C.amberSignal : C.wireGray, backgroundColor: assetType === t ? `${C.amberSignal}15` : "transparent" }]} onPress={() => { setAssetType(t); if (t === "liability") setAddToExistingAssetId(null); }}>
               <Text style={[styles.typeBtnText, { color: assetType === t ? C.amberSignal : C.slateText }]}>{t.toUpperCase()}</Text>
             </TouchableOpacity>
           ))}
@@ -1331,7 +1403,7 @@ export default function FinancesScreen() {
           </>
         )}
         <TouchableOpacity style={[styles.overlaySubmit, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]} onPress={handleAddAsset}>
-          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{editingAsset ? t("common.update") : t("common.add")}</Text>
+          <Text style={[styles.overlaySubmitText, { color: C.amberSignal }]}>{editingAsset ? t("common.update") : addToExistingAssetId ? t("finances.add_to_asset") : t("common.add")}</Text>
         </TouchableOpacity>
       </SimpleOverlay>
 
@@ -2340,6 +2412,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   sourceAmountText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+  },
+  existingAssetScroll: {
+    maxHeight: 48,
+  },
+  existingAssetScrollContent: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  existingAssetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  existingAssetChipText: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+  },
+  existingAssetChipAmount: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 10,
   },
