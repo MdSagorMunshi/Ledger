@@ -72,7 +72,7 @@ export function MonthPickerModal({
         <View style={[styles.modalContent, { backgroundColor: C.vaultDark, borderColor: C.wireGray }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: C.cipherWhite }]}>
-              {t("dashboard.select_month") || "Select Month"}
+              {t("dashboard.select_month")}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Feather name="x" size={20} color={C.ghostText} />
