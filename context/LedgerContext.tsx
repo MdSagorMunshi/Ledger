@@ -261,6 +261,7 @@ interface LedgerState {
   recurringTemplates: RecurringTemplate[];
   appSettings: AppSettings;
   isHydrated: boolean;
+  selectedMonth: string;
 }
 
 interface LedgerContextValue extends LedgerState {
@@ -311,6 +312,8 @@ interface LedgerContextValue extends LedgerState {
   resetLastActivity: () => void;
   lastActivityRef: React.MutableRefObject<number>;
   isHydrated: boolean;
+  selectedMonth: string;
+  setSelectedMonth: (month: string) => void;
   persistNow: () => Promise<void>;
 }
 
@@ -348,6 +351,12 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  const currentMonthStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
 
   useEffect(() => {
     setTypographyPreferences(appSettings);
@@ -929,6 +938,8 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       resetLastActivity,
       lastActivityRef,
       isHydrated,
+      selectedMonth,
+      setSelectedMonth,
       persistNow,
     }),
     [
@@ -992,6 +1003,8 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
       loadFullState,
       resetLastActivity,
       isHydrated,
+      selectedMonth,
+      setSelectedMonth,
       persistNow,
     ]
   );

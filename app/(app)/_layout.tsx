@@ -7,19 +7,30 @@ import {
   Platform,
   Animated,
 } from "react-native";
-import { Tabs, router } from "expo-router";
+import { Tabs, router, usePathname } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLedger } from "@/context/LedgerContext";
 import { performAutoBackup } from "@/utils/autoBackup";
 import colors, { getThemeColors } from "@/constants/colors";
 import { useI18n } from "@/utils/i18n";
+import { MonthPickerModal } from "@/components/MonthPickerModal";
+
+function formatMonthLabel(monthKey: string): string {
+  if (!monthKey) return "";
+  const [year, month] = monthKey.split("-").map(Number);
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
 
 function AppHeader() {
   const insets = useSafeAreaInsets();
-  const { lock, appSettings } = useLedger();
+  const { lock, appSettings, selectedMonth, setSelectedMonth } = useLedger();
   const { t } = useI18n();
   const C = getThemeColors(appSettings.theme);
+  const pathname = usePathname();
+  const isDashboard = pathname === "/dashboard" || pathname === "/";
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const handleLock = () => {
     lock();
@@ -48,13 +59,34 @@ function AppHeader() {
           {t("shell.local_only_no_sync")}
         </Text>
       </View>
-      <TouchableOpacity
-        style={[styles.lockBtn, { borderColor: C.amberSignal }]}
-        onPress={handleLock}
-      >
-        <Feather name="log-out" size={11} color={C.amberSignal} />
-        <Text style={[styles.lockBtnText, { color: C.amberSignal }]}>{t("shell.lock")}</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        {isDashboard && (
+          <TouchableOpacity
+            style={[styles.monthBtn, { borderColor: C.wireGray, backgroundColor: `${C.wireGray}20` }]}
+            onPress={() => setPickerVisible(true)}
+          >
+            <Feather name="calendar" size={11} color={C.cipherWhite} />
+            <Text style={[styles.monthBtnText, { color: C.cipherWhite }]}>
+              {formatMonthLabel(selectedMonth)}
+            </Text>
+            <Feather name="chevron-down" size={10} color={C.ghostText} />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.lockBtn, { borderColor: C.amberSignal }]}
+          onPress={handleLock}
+        >
+          <Feather name="log-out" size={11} color={C.amberSignal} />
+          <Text style={[styles.lockBtnText, { color: C.amberSignal }]}>{t("shell.lock")}</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <MonthPickerModal
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onSelectMonth={setSelectedMonth}
+        selectedMonth={selectedMonth}
+      />
     </View>
   );
 }
@@ -287,6 +319,21 @@ const styles = StyleSheet.create({
   offlineTag: {
     fontFamily: "SyneMono_400Regular",
     fontSize: 9,
+  },
+  monthBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  monthBtnText: {
+    fontFamily: "SyneMono_400Regular",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   lockBtn: {
     flexDirection: "row",

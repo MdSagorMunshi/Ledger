@@ -52,11 +52,6 @@ function BudgetAlert({ category, pct, remaining, C }: {
   );
 }
 
-function getCurrentMonthKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function formatMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split("-").map(Number);
   const d = new Date(year, month - 1, 1);
@@ -76,54 +71,18 @@ export default function Dashboard() {
     formatAmount,
     lastAddedId,
     appSettings,
+    selectedMonth,
+    setSelectedMonth,
   } = useLedger();
 
   const C = getThemeColors(appSettings.theme);
   const { t, tc } = useI18n();
 
-  const currentMonthKey = getCurrentMonthKey();
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const currentMonthKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
   const isCurrentMonth = selectedMonth === currentMonthKey;
-
-  // Get all unique months from transactions
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>();
-    months.add(currentMonthKey);
-    transactions.forEach((tx) => {
-      if (tx.date && tx.date.length >= 7) {
-        months.add(tx.date.substring(0, 7));
-      }
-    });
-    return Array.from(months).sort();
-  }, [transactions, currentMonthKey]);
-
-  const canGoBack = useMemo(() => {
-    const idx = availableMonths.indexOf(selectedMonth);
-    return idx > 0;
-  }, [availableMonths, selectedMonth]);
-
-  const canGoForward = useMemo(() => {
-    const idx = availableMonths.indexOf(selectedMonth);
-    return idx < availableMonths.length - 1;
-  }, [availableMonths, selectedMonth]);
-
-  const goToPrevMonth = () => {
-    const idx = availableMonths.indexOf(selectedMonth);
-    if (idx > 0) {
-      setSelectedMonth(availableMonths[idx - 1]);
-    }
-  };
-
-  const goToNextMonth = () => {
-    const idx = availableMonths.indexOf(selectedMonth);
-    if (idx < availableMonths.length - 1) {
-      setSelectedMonth(availableMonths[idx + 1]);
-    }
-  };
-
-  const goToCurrentMonth = () => {
-    setSelectedMonth(currentMonthKey);
-  };
 
   // Filter transactions for selected month
   const monthTransactions = useMemo(
@@ -231,42 +190,6 @@ export default function Dashboard() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* MONTH NAVIGATOR */}
-      <View style={[styles.monthNav, { borderColor: C.wireGray, backgroundColor: C.vaultDark }]}>
-        <TouchableOpacity
-          style={[styles.monthNavBtn, { opacity: canGoBack ? 1 : 0.3 }]}
-          onPress={goToPrevMonth}
-          disabled={!canGoBack}
-        >
-          <Feather name="chevron-left" size={18} color={C.cipherWhite} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={goToCurrentMonth} activeOpacity={isCurrentMonth ? 1 : 0.7}>
-          <View style={styles.monthNavCenter}>
-            <Text style={[styles.monthNavLabel, { color: C.cipherWhite }]}>
-              {formatMonthLabel(selectedMonth)}
-            </Text>
-            {!isCurrentMonth && (
-              <View style={[styles.monthNavCurrentBadge, { borderColor: C.amberSignal, backgroundColor: `${C.amberSignal}15` }]}>
-                <Feather name="rotate-ccw" size={9} color={C.amberSignal} />
-                <Text style={[styles.monthNavCurrentText, { color: C.amberSignal }]}>
-                  {t("dashboard.current")}
-                </Text>
-              </View>
-            )}
-            {isCurrentMonth && (
-              <View style={[styles.monthNavLiveDot, { backgroundColor: C.creditGreen }]} />
-            )}
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.monthNavBtn, { opacity: canGoForward ? 1 : 0.3 }]}
-          onPress={goToNextMonth}
-          disabled={!canGoForward}
-        >
-          <Feather name="chevron-right" size={18} color={C.cipherWhite} />
-        </TouchableOpacity>
-      </View>
-
       {/* BUDGET ALERTS */}
       {isCurrentMonth && triggeredAlerts.length > 0 && (
         <View style={styles.alertsContainer}>
@@ -381,51 +304,6 @@ const styles = StyleSheet.create({
   nwMiniValue: {
     fontFamily: "JetBrainsMono_600SemiBold",
     fontSize: 18,
-  },
-  monthNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-  },
-  monthNavBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
-  monthNavCenter: {
-    alignItems: "center",
-    gap: 4,
-  },
-  monthNavLabel: {
-    fontFamily: "Syne_700Bold",
-    fontSize: 16,
-    letterSpacing: 1,
-  },
-  monthNavCurrentBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderRadius: 12,
-  },
-  monthNavCurrentText: {
-    fontFamily: "SyneMono_400Regular",
-    fontSize: 8,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  monthNavLiveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
   alertsContainer: { gap: 6 },
   budgetAlert: {
